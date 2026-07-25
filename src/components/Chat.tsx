@@ -90,22 +90,47 @@ export function Chat({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notebookId, question, sourceIds }),
       });
-      const responseBody = await res.json();
-      if (!res.ok) {
-        setError(responseBody.error ?? "Fehler beim Senden der Frage.");
+
+      if (!res.ok || !res.body) {
+        const responseBody = await res.json().catch(() => null);
+        setError(responseBody?.error ?? "Fehler beim Senden der Frage.");
         return;
       }
+
+      const citationsHeader = res.headers.get("X-Citations");
+      const citations: Citation[] = citationsHeader
+        ? JSON.parse(decodeURIComponent(citationsHeader))
+        : [];
+
+      const assistantId = `assistant-${Date.now()}`;
       setMessages((prev) => [
         ...prev,
         {
-          id: `assistant-${Date.now()}`,
+          id: assistantId,
           notebook_id: notebookId,
           role: "assistant",
-          content: responseBody.answer,
-          citations: responseBody.citations,
+          content: "",
+          citations,
           created_at: new Date().toISOString(),
         },
       ]);
+
+      // Tokens erscheinen inkrementell im UI, sobald sie ankommen ([chunk:N]-
+      // Marker koennen dabei fragmentiert reinkommen -- die Regex im Renderer
+      // matcht dann einfach erst, sobald der Marker vollstaendig im Text steht).
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let content = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        content += decoder.decode(value, { stream: true });
+        const currentContent = content;
+        setMessages((prev) =>
+          prev.map((m) => (m.id === assistantId ? { ...m, content: currentContent } : m))
+        );
+      }
     } catch {
       setError("Netzwerkfehler beim Senden der Frage.");
     } finally {

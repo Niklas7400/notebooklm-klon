@@ -58,6 +58,60 @@ export function answerQuestion(
   ]);
 }
 
+// Streaming-Variante fuer den Chat (Tag 6): liefert die Antwort als Folge von
+// Text-Deltas statt einmalig am Stueck, damit das Frontend Tokens anzeigen
+// kann, sobald sie ankommen. Groq streamt im gleichen SSE-Format wie OpenAI
+// ("data: {...}\n\n", abgeschlossen mit "data: [DONE]").
+export async function* streamAnswerQuestion(
+  systemPrompt: string,
+  history: ChatMessage[],
+  question: string
+): AsyncGenerator<string> {
+  const messages: ChatMessage[] = [
+    { role: "system", content: systemPrompt },
+    ...history,
+    { role: "user", content: question },
+  ];
+
+  const res = await fetch(GROQ_CHAT_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ model: CHAT_MODEL, messages, stream: true }),
+  });
+
+  if (!res.ok || !res.body) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Groq-Streaming-Request fehlgeschlagen (${res.status}): ${body}`);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) continue;
+      const data = trimmed.slice(5).trim();
+      if (data === "[DONE]") return;
+
+      const json = JSON.parse(data);
+      const delta: string | undefined = json.choices?.[0]?.delta?.content;
+      if (delta) yield delta;
+    }
+  }
+}
+
 // Notebook Guide: kurze Zusammenfassung ueber alle Quellen, bei jedem Upload
 // neu erzeugt (nicht nur beim ersten), damit sie nach dem zweiten Upload
 // nicht veraltet wirkt.

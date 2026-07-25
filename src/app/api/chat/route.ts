@@ -1,15 +1,40 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { embedQuery } from "@/lib/voyage";
 import { searchChunks } from "@/lib/retrieval";
-import { rewriteQuery, answerQuestion, type ChatMessage } from "@/lib/groq";
+import { rewriteQuery, streamAnswerQuestion, type ChatMessage } from "@/lib/groq";
 import { buildSystemPrompt, buildCitations } from "@/lib/prompt";
+import type { Citation } from "@/lib/types";
 
 // Chat/RAG-Flow (siehe CLAUDE.md): Guard -> Verlauf laden -> ggf. Query-Rewriting
-// -> Embedding -> Aehnlichkeitssuche -> Groq-Antwort -> Speichern.
+// -> Embedding -> Aehnlichkeitssuche -> Groq-Antwort (gestreamt) -> Speichern.
+//
+// Streaming-Ansatz (Tag 6): Die Antwort wird als reiner Text-Stream an den
+// Client geschickt. Die Zitate haengen nicht vom Antworttext ab (sie werden
+// schon aus den match_chunks-Treffern gebaut, bevor das LLM ueberhaupt
+// aufgerufen wird) und koennen deshalb sofort als Header mitgeschickt werden,
+// statt auf das Streamende zu warten. Die vollstaendige Assistant-Nachricht
+// wird erst persistiert, nachdem der Stream zu Ende gelesen wurde -- sonst
+// waere der Chatverlauf nach einem Reload halb leer, obwohl das Streaming
+// selbst einwandfrei lief.
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 const HISTORY_LIMIT = 5;
+
+function textStreamResponse(text: string, citations: Citation[]) {
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(text));
+      controller.close();
+    },
+  });
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "X-Citations": encodeURIComponent(JSON.stringify(citations)),
+    },
+  });
+}
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -35,10 +60,10 @@ export async function POST(request: Request) {
     .limit(1);
 
   if (!existingSources || existingSources.length === 0) {
-    return Response.json({
-      answer: "Lade zuerst eine Quelle hoch, um Fragen stellen zu können.",
-      citations: [],
-    });
+    return textStreamResponse(
+      "Lade zuerst eine Quelle hoch, um Fragen stellen zu können.",
+      []
+    );
   }
 
   const { data: historyRows } = await supabase
@@ -61,13 +86,39 @@ export async function POST(request: Request) {
   const results = await searchChunks(notebookId, queryEmbedding, sourceIds);
 
   const systemPrompt = buildSystemPrompt(results);
-  const answer = await answerQuestion(systemPrompt, history, question);
   const citations = buildCitations(results);
 
-  await supabase.from("messages").insert([
-    { notebook_id: notebookId, role: "user", content: question },
-    { notebook_id: notebookId, role: "assistant", content: answer, citations },
-  ]);
+  const encoder = new TextEncoder();
+  let fullAnswer = "";
 
-  return Response.json({ answer, citations });
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        for await (const delta of streamAnswerQuestion(systemPrompt, history, question)) {
+          fullAnswer += delta;
+          controller.enqueue(encoder.encode(delta));
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Unbekannter Fehler beim Streaming.";
+        // Falls schon Text raus ist, den Fehler anhaengen statt den Stream
+        // ohne Erklaerung abzubrechen.
+        controller.enqueue(encoder.encode(`\n\n[Fehler: ${message}]`));
+      } finally {
+        // Nachricht + aufgeloeste Zitate erst nach Streamende persistieren,
+        // sonst ist der Verlauf nach einem Reload halb leer.
+        await supabase.from("messages").insert([
+          { notebook_id: notebookId, role: "user", content: question },
+          { notebook_id: notebookId, role: "assistant", content: fullAnswer, citations },
+        ]);
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "X-Citations": encodeURIComponent(JSON.stringify(citations)),
+    },
+  });
 }
