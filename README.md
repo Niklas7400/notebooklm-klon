@@ -1,36 +1,93 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# NotebookLM-Klon
 
-## Getting Started
+Ein funktionierender Klon von [NotebookLM](https://notebooklm.google.com), gebaut als Bewerbungsaufgabe für Everlast Consulting GmbH. Ziel war zu zeigen, dass ich eine RAG-Architektur (Retrieval-Augmented Generation) sauber umsetzen und dabei den Umfang eines Ein-Wochen-Projekts realistisch priorisieren kann.
 
-First, run the development server:
+## Was die App kann
+
+1. Notebooks anlegen und löschen
+2. Quellen hochladen: PDF, eingefügter Text, **URL** (Fetch + HTML-Text-Extraktion)
+3. Quellen werden automatisch in Chunks zerlegt, embedded und in einer Vektordatenbank durchsuchbar gemacht
+4. Chat mit **Streaming-Antworten**, die auf konkrete Quellstellen verweisen (klickbare Zitat-Nummern im Text zeigen den referenzierten Ausschnitt in der Sidebar)
+5. Bei jedem Upload wird automatisch eine aktuelle Zusammenfassung ("Notebook Guide") erzeugt und persistent gespeichert — einklappbar in der Sidebar
+6. Quellen-Auswahl per Checkbox (nur ausgewählte Quellen befragen)
+7. Chatverlauf bleibt nach einem Reload erhalten, Chat lässt sich zurücksetzen
+8. Ein vorbefülltes Demo-Notebook ist beim Öffnen des Live-Links sofort verfügbar
+
+## Architektur
+
+Next.js (App Router) als Frontend und API-Layer in einem, Supabase/Postgres mit `pgvector` als Vektordatenbank, Voyage AI für Embeddings und Groq (Llama 3.3 70B, OpenAI-kompatible API) als Chat-LLM. Alle DB-Zugriffe laufen serverseitig über den Supabase Service-Role-Key; der Anon-Key wird im Client-Bundle nie für Datenzugriffe verwendet. Der RAG-Flow ist klassisch zweiphasig: Ingestion (Text extrahieren → chunken → embedden → speichern) und Retrieval (Frage embedden → Ähnlichkeitssuche via `match_chunks`-RPC → Antwort mit lokal nummerierten Zitaten, die serverseitig auf echte Chunk-IDs zurückgemappt werden).
+
+## Tech-Stack
+
+| Bereich | Wahl | Warum |
+|---|---|---|
+| Framework | Next.js (App Router) + TypeScript + Tailwind CSS | Vorgabe |
+| PDF-Parsing | [`unpdf`](https://github.com/unjs/unpdf) | Läuft ohne native Abhängigkeiten in Vercel Serverless Functions |
+| Chunking | LangChain.js `RecursiveCharacterTextSplitter` | ~1800 Zeichen/Chunk (≈500 Tokens), 200 Zeichen Overlap |
+| Embeddings | Voyage AI, `voyage-4-lite` | 200 Mio. Freitokens/Account, hohes Batch-Limit (1M Tokens/Request) |
+| Vektor-Speicher | Supabase (Postgres + `pgvector`) | REST-basierter JS-Client statt direkter Postgres-Connection (Connection-Limits in Serverless Functions) |
+| Chat-LLM | Groq, `llama-3.3-70b-versatile` (Chat/Zusammenfassung), `llama-3.1-8b-instant` (Query-Rewriting) | Echter Free-Tier ohne Kreditkarte, keine EU-Einschränkung |
+| Text-to-Speech | Google Cloud TTS (WaveNet/Neural2) | Für Audio Overview vorgesehen, siehe [Status](#status--was-noch-fehlt) |
+| Deployment | Vercel | Auto-Deploy bei Push auf `main` |
+
+## Setup
 
 ```bash
+npm install
+cp .env.example .env.local   # Werte eintragen, siehe unten
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Supabase-Schema einmalig im SQL-Editor ausführen: [`supabase/schema.sql`](supabase/schema.sql) (Tabellen, RLS, HNSW-Index, `match_chunks`-Funktion).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+GROQ_API_KEY=                    # console.groq.com
+VOYAGE_API_KEY=                  # dash.voyageai.com — Zahlungsmethode hinterlegen, sonst nur 3 RPM/10K TPM
+GOOGLE_CLOUD_TTS_API_KEY=        # console.cloud.google.com (Audio Overview, noch nicht umgesetzt)
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+SITE_PASSWORD=                   # Middleware-Passwort-Gate, leer lassen = kein Schutz
+```
 
-## Learn More
+### Tests
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm test
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+11 Unit-Tests für Chunker (`src/lib/chunking.ts`), Zitat-Parser (`src/lib/citations.ts`) und Leertext-Validierung (`src/lib/ingestion.ts`) — die drei Stellen, an denen sich Formatannahmen am leichtesten stillschweigend brechen lassen.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Bewusste Scope-Entscheidungen
 
-## Deploy on Vercel
+Der Umfang war frei wählbar. Umgesetzt wurden, in dieser Priorität:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **MVP**: Notebooks/Quellen/Chat verwalten, RAG-Chat mit Zitaten, automatische Zusammenfassung, persistenter Chatverlauf, RLS auf allen Tabellen, Guard fürs Demo-Notebook
+- **Streaming-Chat-Antworten** — vor Audio Overview, weil es die im MVP schon vorhandene Antwortqualität spürbar verbessert (kein Warten auf den kompletten Text), bevor ein komplett neues Feature dazukommt
+- **Quellen-Auswahl per Checkbox, URL-Quelle, vorbefülltes Demo-Notebook, Passwortschutz** — hoher Wirkungsgrad bei geringem Aufwand: ein Reviewer hat typischerweise nur wenige Minuten Zeit, das vorbefüllte Demo-Notebook dürfte davon den größten Unterschied machen
+- **Audio Overview** (Zwei-Stimmen-Podcast) bewusst vor die ursprünglich geplanten "Nice-to-have"-Punkte 1 und 3 gezogen, weil Everlast Voice Agents als eines ihrer Aushängeschilder führt — dieses Feature auszulassen wäre strategisch ungeschickt gewesen. Aktueller Stand siehe unten.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**Explizit nicht umgesetzt** (bewusste Entscheidung, kein Zeitmangel-Zufall):
+
+- Mind Map / Video Overview / Sharing / "Discover Sources" — weitere NotebookLM-Features außerhalb des gesetzten Rahmens
+- Pixelgenaues Highlighting im PDF-Viewer — der referenzierte Textausschnitt in der Sidebar reicht als Beleg
+- Multi-User-Auth/Rechteverwaltung — Deployment ist ein einzelner passwortgeschützter Demo-Zugang, keine Nutzerverwaltung nötig
+
+## Status & was noch fehlt
+
+Der Audio Overview (Tag 8 im ursprünglichen Bauplan) ist zum Zeitpunkt dieses Commits noch nicht umgesetzt — `GOOGLE_CLOUD_TTS_API_KEY` ist noch nicht hinterlegt. Alles andere aus dem MVP plus den oben genannten Erweiterungen funktioniert und wurde gegen das echte Live-Deployment getestet.
+
+## Bekannte Grenzen
+
+- **Kein OCR**: Gescannte PDFs ohne Text-Layer liefern leeren Text und werden mit einer klaren Fehlermeldung abgelehnt, statt sie stillschweigend als leere Quelle zu speichern.
+- **Kein Reranking**: Die Ähnlichkeitssuche liefert die Top-K-Treffer nach Kosinus-Distanz direkt an das LLM weiter, ohne einen zweiten, genaueren Relevanz-Schritt. Nächster naheliegender Qualitätsschritt, wurde für dieses Projekt aber bewusst nicht gebaut.
+- **Keine Hybrid-Suche**: Nur Vektorsuche, keine Kombination mit klassischer Stichwortsuche (BM25 o.ä.) — bei sehr spezifischen Eigennamen/Zahlen kann das reine Embedding-Matching schwächer sein.
+- **Keine Mandantentrennung**: Alle Notebooks liegen in derselben Tabelle ohne User-Scoping — passend zum Deployment als einzelner Demo-Zugang, nicht für Mehrbenutzerbetrieb gedacht.
+- **HTML-Extraktion bei URL-Quellen** ist eine einfache, Regex-basierte Bereinigung (kein Readability-Algorithmus) — bei Seiten mit viel Navigations-/Boilerplate-Text landet dieser mit im extrahierten Text.
+- **Open-Source-LLM-Grenzen**: Llama hält sich bei strikten Format-/Verhaltensvorgaben (Zitat-Format, "nur aus den Quellen antworten") in der Praxis etwas weniger zuverlässig an Vorgaben als z. B. Claude — siehe `NOTES.md` für konkret beobachtete Fälle und mögliche Prompt-Verbesserungen.
+
+## Datenmodell
+
+Siehe [`supabase/schema.sql`](supabase/schema.sql). Kurzfassung: `notebooks` → `sources` → `chunks` (mit `pgvector`-Embedding), sowie `messages` für den Chatverlauf. Cascade-Deletes auf allen Fremdschlüsseln, Row Level Security auf allen Tabellen aktiv (keine Policies — alle Zugriffe laufen serverseitig über den Service-Role-Key).
