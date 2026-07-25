@@ -6,8 +6,10 @@ export type AudioScriptLine = {
 };
 
 export type Citation = {
+  local_id: number;
   source_id: string;
   chunk_id: string;
+  filename: string;
   snippet: string;
 };
 

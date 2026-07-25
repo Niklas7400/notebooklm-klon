@@ -42,3 +42,8 @@ async function embed(inputs: string[], inputType: "document" | "query"): Promise
 export function embedDocuments(texts: string[]): Promise<number[][]> {
   return embed(texts, "document");
 }
+
+export async function embedQuery(text: string): Promise<number[]> {
+  const [embedding] = await embed([text], "query");
+  return embedding;
+}
