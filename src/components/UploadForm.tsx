@@ -3,7 +3,13 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
-export function UploadForm({ notebookId }: { notebookId: string }) {
+export function UploadForm({
+  notebookId,
+  onUploaded,
+}: {
+  notebookId: string;
+  onUploaded?: () => void;
+}) {
   const router = useRouter();
   const [mode, setMode] = useState<"pdf" | "text">("pdf");
   const [pending, setPending] = useState(false);
@@ -27,6 +33,7 @@ export function UploadForm({ notebookId }: { notebookId: string }) {
       }
       formRef.current?.reset();
       router.refresh();
+      onUploaded?.();
     } catch {
       setError("Upload fehlgeschlagen — Netzwerkfehler.");
     } finally {

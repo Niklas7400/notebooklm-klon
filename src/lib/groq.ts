@@ -57,3 +57,15 @@ export function answerQuestion(
     { role: "user", content: question },
   ]);
 }
+
+// Notebook Guide: kurze Zusammenfassung ueber alle Quellen, bei jedem Upload
+// neu erzeugt (nicht nur beim ersten), damit sie nach dem zweiten Upload
+// nicht veraltet wirkt.
+export function summarizeSources(context: string): Promise<string> {
+  const prompt = `Erstelle eine kurze, gut lesbare Zusammenfassung ("Notebook Guide") der folgenden Quellen fuer jemanden, der sich schnell einen Ueberblick verschaffen will. 3-6 Saetze oder kurze Bullet Points, die die Kernaussagen aller Quellen zusammen abdecken. Antworte in der Sprache der Quellen.
+
+Quellen:
+${context}`;
+
+  return groqChat(CHAT_MODEL, [{ role: "user", content: prompt }]);
+}

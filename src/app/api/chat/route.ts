@@ -15,6 +15,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const notebookId = body?.notebookId;
   const question = typeof body?.question === "string" ? body.question.trim() : "";
+  const sourceIds: string[] | null = Array.isArray(body?.sourceIds) ? body.sourceIds : null;
 
   if (typeof notebookId !== "string" || !notebookId) {
     return Response.json({ error: "notebookId fehlt." }, { status: 400 });
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
   const searchQuery = history.length > 0 ? await rewriteQuery(question, history) : question;
 
   const queryEmbedding = await embedQuery(searchQuery);
-  const results = await searchChunks(notebookId, queryEmbedding);
+  const results = await searchChunks(notebookId, queryEmbedding, sourceIds);
 
   const systemPrompt = buildSystemPrompt(results);
   const answer = await answerQuestion(systemPrompt, history, question);

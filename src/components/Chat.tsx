@@ -51,10 +51,12 @@ function renderContent(
 export function Chat({
   notebookId,
   initialMessages,
+  sourceIds,
   onCitationClick,
 }: {
   notebookId: string;
   initialMessages: Message[];
+  sourceIds: string[] | null;
   onCitationClick: (citation: Citation) => void;
 }) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
@@ -86,7 +88,7 @@ export function Chat({
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notebookId, question }),
+        body: JSON.stringify({ notebookId, question, sourceIds }),
       });
       const responseBody = await res.json();
       if (!res.ok) {
