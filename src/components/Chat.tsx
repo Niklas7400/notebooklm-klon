@@ -2,10 +2,7 @@
 
 import { useState, type FormEvent, type ReactNode } from "react";
 import type { Citation, Message } from "@/lib/types";
-
-// Tolerant gegenueber leichten Format-Abweichungen des Modells (z.B. ohne
-// eckige Klammern), siehe Hinweis zur Zitat-Zuverlaessigkeit in CLAUDE.md.
-const CITATION_REGEX = /\[?chunk:\s*(\d+)\]?/gi;
+import { splitContentByCitations } from "@/lib/citations";
 
 function renderContent(
   content: string,
@@ -14,38 +11,24 @@ function renderContent(
 ): ReactNode {
   if (!citations || citations.length === 0) return content;
 
-  const parts: ReactNode[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  const regex = new RegExp(CITATION_REGEX);
   let key = 0;
+  return splitContentByCitations(content).map((segment) => {
+    if (segment.type === "text") return segment.value;
 
-  while ((match = regex.exec(content)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push(content.slice(lastIndex, match.index));
-    }
-    const localId = parseInt(match[1], 10);
-    const citation = citations.find((c) => c.local_id === localId);
-    if (citation) {
-      parts.push(
-        <button
-          key={`c-${key++}`}
-          type="button"
-          onClick={() => onCitationClick(citation)}
-          className="mx-0.5 rounded bg-neutral-300 px-1.5 py-0.5 text-xs font-medium text-neutral-700 hover:bg-neutral-400 dark:bg-neutral-600 dark:text-neutral-100 dark:hover:bg-neutral-500"
-        >
-          {localId}
-        </button>
-      );
-    } else {
-      parts.push(match[0]);
-    }
-    lastIndex = regex.lastIndex;
-  }
-  if (lastIndex < content.length) {
-    parts.push(content.slice(lastIndex));
-  }
-  return parts;
+    const citation = citations.find((c) => c.local_id === segment.localId);
+    if (!citation) return segment.raw;
+
+    return (
+      <button
+        key={`c-${key++}`}
+        type="button"
+        onClick={() => onCitationClick(citation)}
+        className="mx-0.5 rounded bg-neutral-300 px-1.5 py-0.5 text-xs font-medium text-neutral-700 hover:bg-neutral-400 dark:bg-neutral-600 dark:text-neutral-100 dark:hover:bg-neutral-500"
+      >
+        {segment.localId}
+      </button>
+    );
+  });
 }
 
 export function Chat({
