@@ -59,7 +59,7 @@ export function UploadForm({ notebookId }: { notebookId: string }) {
           name="file"
           accept="application/pdf"
           required
-          className="text-xs"
+          className="text-xs text-neutral-500 file:mr-2 file:cursor-pointer file:rounded-md file:border-0 file:bg-neutral-900 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-white hover:file:bg-neutral-700 dark:text-neutral-400 dark:file:bg-white dark:file:text-neutral-900 dark:hover:file:bg-neutral-200"
         />
       ) : (
         <>
