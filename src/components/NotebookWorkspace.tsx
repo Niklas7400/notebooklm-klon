@@ -23,6 +23,7 @@ export function NotebookWorkspace({
   const [excludedSourceIds, setExcludedSourceIds] = useState<Set<string>>(new Set());
   const [summary, setSummary] = useState(notebook.summary);
   const [summarizing, setSummarizing] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(true);
   const [chatResetKey, setChatResetKey] = useState(0);
 
   function toggleSource(id: string) {
@@ -101,22 +102,31 @@ export function NotebookWorkspace({
 
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+            <button
+              type="button"
+              onClick={() => setSummaryOpen((open) => !open)}
+              className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+              aria-expanded={summaryOpen}
+            >
+              <span className={`inline-block transition-transform ${summaryOpen ? "rotate-90" : ""}`}>
+                ▶
+              </span>
               Zusammenfassung
-            </h2>
+            </button>
             {summarizing && (
               <span className="text-[10px] text-neutral-400">wird aktualisiert…</span>
             )}
           </div>
-          {summary ? (
-            <p className="whitespace-pre-wrap text-xs text-neutral-600 dark:text-neutral-400">
-              {summary}
-            </p>
-          ) : (
-            <p className="text-xs text-neutral-500">
-              {summarizing ? "Wird erstellt…" : "Noch keine Zusammenfassung."}
-            </p>
-          )}
+          {summaryOpen &&
+            (summary ? (
+              <p className="whitespace-pre-wrap text-xs text-neutral-600 dark:text-neutral-400">
+                {summary}
+              </p>
+            ) : (
+              <p className="text-xs text-neutral-500">
+                {summarizing ? "Wird erstellt…" : "Noch keine Zusammenfassung."}
+              </p>
+            ))}
         </div>
 
         <div>
