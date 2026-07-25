@@ -1,8 +1,11 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractPdfText, validateSourceText } from "@/lib/ingestion";
+import { chunkText } from "@/lib/chunking";
+import { embedDocuments } from "@/lib/voyage";
 
-// Upload-Flow: Text-Extraktion -> Validierung -> Speichern (siehe CLAUDE.md).
-// Chunking + Embeddings folgen als separater Schritt (Tag 3).
+// Upload-Flow: Text-Extraktion -> Validierung -> Speichern -> Chunking ->
+// Batch-Embeddings -> Speichern (siehe CLAUDE.md). Die Zusammenfassung wird
+// als separater, vom Frontend ausgeloester Request nachgereicht (Tag 5).
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
@@ -60,15 +63,41 @@ export async function POST(request: Request) {
   }
 
   const supabase = createAdminClient();
-  const { data, error } = await supabase
+  const { data: source, error: sourceError } = await supabase
     .from("sources")
     .insert({ notebook_id: notebookId, filename, raw_text: rawText })
     .select()
     .single();
 
-  if (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+  if (sourceError) {
+    return Response.json({ error: sourceError.message }, { status: 500 });
   }
 
-  return Response.json(data, { status: 201 });
+  const chunks = await chunkText(rawText);
+
+  try {
+    const embeddings = await embedDocuments(chunks);
+
+    const { error: chunksError } = await supabase.from("chunks").insert(
+      chunks.map((content, i) => ({
+        source_id: source.id,
+        content,
+        embedding: embeddings[i],
+        chunk_index: i,
+      }))
+    );
+    if (chunksError) throw new Error(chunksError.message);
+  } catch (err) {
+    // Ohne Chunks/Embeddings ist die Quelle nicht durchsuchbar -- lieber
+    // sauber abbrechen (inkl. Aufraeumen) statt eine unvollstaendige Quelle
+    // stehen zu lassen, die im Chat nie Treffer liefert.
+    await supabase.from("sources").delete().eq("id", source.id);
+    const message = err instanceof Error ? err.message : "Unbekannter Fehler";
+    return Response.json(
+      { error: `Embeddings konnten nicht erzeugt werden: ${message}` },
+      { status: 502 }
+    );
+  }
+
+  return Response.json({ ...source, chunkCount: chunks.length }, { status: 201 });
 }
