@@ -24,13 +24,15 @@ export function buildSystemPrompt(results: MatchChunkResult[]): string {
 
 // localId (Position in der Trefferliste, 1-basiert) -> echte Chunk-/Source-ID.
 // Server-seitig schon aus der match_chunks-Antwort bekannt, kein zusaetzlicher
-// DB-Call noetig, um [chunk:N] spaeter aufzuloesen.
+// DB-Call noetig, um [chunk:N] spaeter aufzuloesen. Voller Chunk-Text als
+// Snippet (nicht gekuerzt) -- eine feste Zeichenzahl schneidet sonst je nach
+// Chunk-Laenge mitten im zitierten Satz ab, die Sidebar scrollt bei Bedarf.
 export function buildCitations(results: MatchChunkResult[]): Citation[] {
   return results.map((r, i) => ({
     local_id: i + 1,
     source_id: r.source_id,
     chunk_id: r.id,
     filename: r.filename,
-    snippet: r.content.slice(0, 300),
+    snippet: r.content,
   }));
 }

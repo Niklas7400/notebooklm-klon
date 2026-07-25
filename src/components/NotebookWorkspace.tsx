@@ -65,7 +65,7 @@ export function NotebookWorkspace({
                 ✕
               </button>
             </div>
-            <p className="text-neutral-600 dark:text-neutral-400">
+            <p className="max-h-64 overflow-y-auto whitespace-pre-wrap text-neutral-600 dark:text-neutral-400">
               {selectedCitation.snippet}
             </p>
           </div>
