@@ -128,7 +128,7 @@ export function NotebookWorkspace({
               <button
                 type="button"
                 onClick={handleResetChat}
-                className="text-[10px] text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+                className="rounded border border-neutral-300 px-2 py-1 text-xs font-medium text-neutral-600 hover:border-neutral-400 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
               >
                 Chat zurücksetzen
               </button>
