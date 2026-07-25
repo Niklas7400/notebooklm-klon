@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { UploadForm } from "@/components/UploadForm";
 import { Chat } from "@/components/Chat";
+import { AudioOverview } from "@/components/AudioOverview";
 import type { Citation, Message, Notebook, Source } from "@/lib/types";
 
 type SourceListItem = Pick<Source, "id" | "filename">;
@@ -175,6 +176,14 @@ export function NotebookWorkspace({
             </ul>
           )}
         </div>
+
+        <AudioOverview
+          notebookId={notebook.id}
+          hasSources={sources.length > 0}
+          initialScript={notebook.audio_script}
+          initialClipUrls={notebook.audio_clip_urls}
+          initialStatus={notebook.audio_status}
+        />
 
         {selectedCitation && (
           <div className="rounded border border-neutral-200 p-3 text-xs dark:border-neutral-800">

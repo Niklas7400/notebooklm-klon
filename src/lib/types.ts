@@ -19,7 +19,10 @@ export type Notebook = {
   summary: string | null;
   is_demo: boolean;
   audio_script: AudioScriptLine[] | null;
-  audio_clip_urls: string[] | null;
+  // Ein einzelner Eintrag ist null, wenn der TTS-Call fuer diese Skript-Zeile
+  // trotz Retry fehlgeschlagen ist (siehe audio-Route) -- die Zeile bleibt im
+  // Skript/Transkript sichtbar, der Player ueberspringt nur den fehlenden Clip.
+  audio_clip_urls: (string | null)[] | null;
   audio_status: AudioStatus;
   created_at: string;
 };

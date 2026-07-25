@@ -12,6 +12,7 @@ Ein funktionierender Klon von [NotebookLM](https://notebooklm.google.com), gebau
 6. Quellen-Auswahl per Checkbox (nur ausgewählte Quellen befragen)
 7. Chatverlauf bleibt nach einem Reload erhalten, Chat lässt sich zurücksetzen
 8. Ein vorbefülltes Demo-Notebook ist beim Öffnen des Live-Links sofort verfügbar
+9. **Audio Overview**: auf Knopfdruck ein Zwei-Stimmen-Podcast-Gespräch über die Notebook-Inhalte generieren (Groq für das Skript, Google Cloud TTS für die Sprachausgabe, sequenzielle Wiedergabe im Player)
 
 ## Architektur
 
@@ -27,7 +28,7 @@ Next.js (App Router) als Frontend und API-Layer in einem, Supabase/Postgres mit 
 | Embeddings | Voyage AI, `voyage-4-lite` | 200 Mio. Freitokens/Account, hohes Batch-Limit (1M Tokens/Request) |
 | Vektor-Speicher | Supabase (Postgres + `pgvector`) | REST-basierter JS-Client statt direkter Postgres-Connection (Connection-Limits in Serverless Functions) |
 | Chat-LLM | Groq, `llama-3.3-70b-versatile` (Chat/Zusammenfassung), `llama-3.1-8b-instant` (Query-Rewriting) | Echter Free-Tier ohne Kreditkarte, keine EU-Einschränkung |
-| Text-to-Speech | Google Cloud TTS (WaveNet/Neural2) | Für Audio Overview vorgesehen, siehe [Status](#status--was-noch-fehlt) |
+| Text-to-Speech | Google Cloud TTS (WaveNet), Stimmen `de-DE-Wavenet-F` / `de-DE-Wavenet-B` | ~1 Mio. Freizeichen/Monat, zwei unterschiedliche Stimmen für die zwei Podcast-Hosts |
 | Deployment | Vercel | Auto-Deploy bei Push auf `main` |
 
 ## Setup
@@ -38,14 +39,14 @@ cp .env.example .env.local   # Werte eintragen, siehe unten
 npm run dev
 ```
 
-Supabase-Schema einmalig im SQL-Editor ausführen: [`supabase/schema.sql`](supabase/schema.sql) (Tabellen, RLS, HNSW-Index, `match_chunks`-Funktion).
+Supabase-Schema einmalig im SQL-Editor ausführen: [`supabase/schema.sql`](supabase/schema.sql) (Tabellen, RLS, HNSW-Index, `match_chunks`-Funktion). Der Storage-Bucket `audio-clips` für Audio-Overview-Clips wird beim ersten Generieren automatisch (public) angelegt, kein manueller Schritt nötig.
 
 ### Environment Variables
 
 ```
 GROQ_API_KEY=                    # console.groq.com
 VOYAGE_API_KEY=                  # dash.voyageai.com — Zahlungsmethode hinterlegen, sonst nur 3 RPM/10K TPM
-GOOGLE_CLOUD_TTS_API_KEY=        # console.cloud.google.com (Audio Overview, noch nicht umgesetzt)
+GOOGLE_CLOUD_TTS_API_KEY=        # console.cloud.google.com (Audio Overview)
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
@@ -67,7 +68,7 @@ Der Umfang war frei wählbar. Umgesetzt wurden, in dieser Priorität:
 - **MVP**: Notebooks/Quellen/Chat verwalten, RAG-Chat mit Zitaten, automatische Zusammenfassung, persistenter Chatverlauf, RLS auf allen Tabellen, Guard fürs Demo-Notebook
 - **Streaming-Chat-Antworten** — vor Audio Overview, weil es die im MVP schon vorhandene Antwortqualität spürbar verbessert (kein Warten auf den kompletten Text), bevor ein komplett neues Feature dazukommt
 - **Quellen-Auswahl per Checkbox, URL-Quelle, vorbefülltes Demo-Notebook, Passwortschutz** — hoher Wirkungsgrad bei geringem Aufwand: ein Reviewer hat typischerweise nur wenige Minuten Zeit, das vorbefüllte Demo-Notebook dürfte davon den größten Unterschied machen
-- **Audio Overview** (Zwei-Stimmen-Podcast) bewusst vor die ursprünglich geplanten "Nice-to-have"-Punkte 1 und 3 gezogen, weil Everlast Voice Agents als eines ihrer Aushängeschilder führt — dieses Feature auszulassen wäre strategisch ungeschickt gewesen. Aktueller Stand siehe unten.
+- **Audio Overview** (Zwei-Stimmen-Podcast) bewusst vor die ursprünglich geplanten "Nice-to-have"-Punkte 1 und 3 gezogen, weil Everlast Voice Agents als eines ihrer Aushängeschilder führt — dieses Feature auszulassen wäre strategisch ungeschickt gewesen. On-demand per Button, nicht automatisch bei jedem Upload, weil TTS im Gegensatz zu Groq ein begrenztes Freikontingent hat.
 
 **Explizit nicht umgesetzt** (bewusste Entscheidung, kein Zeitmangel-Zufall):
 
@@ -75,9 +76,9 @@ Der Umfang war frei wählbar. Umgesetzt wurden, in dieser Priorität:
 - Pixelgenaues Highlighting im PDF-Viewer — der referenzierte Textausschnitt in der Sidebar reicht als Beleg
 - Multi-User-Auth/Rechteverwaltung — Deployment ist ein einzelner passwortgeschützter Demo-Zugang, keine Nutzerverwaltung nötig
 
-## Status & was noch fehlt
+## Status
 
-Der Audio Overview (Tag 8 im ursprünglichen Bauplan) ist zum Zeitpunkt dieses Commits noch nicht umgesetzt — `GOOGLE_CLOUD_TTS_API_KEY` ist noch nicht hinterlegt. Alles andere aus dem MVP plus den oben genannten Erweiterungen funktioniert und wurde gegen das echte Live-Deployment getestet.
+Alle Punkte aus MVP, den Tag-5-Erweiterungen, Streaming (Tag 6) und Audio Overview (Tag 8) sind umgesetzt und wurden gegen das echte Live-Deployment getestet — inklusive Fehlerfällen (fehlgeschlagene TTS-Calls, parallele Generierungs-Requests, leeres Notebook).
 
 ## Bekannte Grenzen
 
@@ -87,6 +88,7 @@ Der Audio Overview (Tag 8 im ursprünglichen Bauplan) ist zum Zeitpunkt dieses C
 - **Keine Mandantentrennung**: Alle Notebooks liegen in derselben Tabelle ohne User-Scoping — passend zum Deployment als einzelner Demo-Zugang, nicht für Mehrbenutzerbetrieb gedacht.
 - **HTML-Extraktion bei URL-Quellen** ist eine einfache, Regex-basierte Bereinigung (kein Readability-Algorithmus) — bei Seiten mit viel Navigations-/Boilerplate-Text landet dieser mit im extrahierten Text.
 - **Open-Source-LLM-Grenzen**: Llama hält sich bei strikten Format-/Verhaltensvorgaben (Zitat-Format, "nur aus den Quellen antworten") in der Praxis etwas weniger zuverlässig an Vorgaben als z. B. Claude — siehe `NOTES.md` für konkret beobachtete Fälle und mögliche Prompt-Verbesserungen.
+- **Audio Overview läuft synchron innerhalb eines Requests** (kein Job-Queue-System) — bei sehr langen Skripten könnte das theoretisch an das Vercel-Timeout (60s) stoßen; in Tests mit 10–16 Gesprächszeilen lag die Generierung bei 3–8s. Einzelne fehlgeschlagene TTS-Zeilen werden übersprungen (nach einem Retry), statt den ganzen Flow abzubrechen.
 
 ## Datenmodell
 

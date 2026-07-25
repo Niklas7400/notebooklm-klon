@@ -1,3 +1,5 @@
+import type { AudioScriptLine } from "@/lib/types";
+
 const GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 const CHAT_MODEL = "llama-3.3-70b-versatile";
@@ -122,4 +124,52 @@ Quellen:
 ${context}`;
 
   return groqChat(CHAT_MODEL, [{ role: "user", content: prompt }]);
+}
+
+// Audio Overview (Tag 8): lockeres Zwei-Personen-Podcast-Skript als JSON.
+// Auf Anfrage generiert, nicht bei jedem Upload (siehe CLAUDE.md) -- TTS hat
+// im Gegensatz zu Groq ein begrenztes Freikontingent.
+export async function generateAudioScript(context: string): Promise<AudioScriptLine[]> {
+  const prompt = `Erstelle ein lockeres Zwei-Personen-Podcast-Gespräch (Host A und Host B) auf Basis der folgenden Notebook-Inhalte. Ca. 3-5 Minuten Sprechzeit (etwa 12-18 kurze Gesprächs-Zeilen), locker und natürlich im Ton, für Laien verständlich, greift die Kernaussagen der Quellen auf. Antworte in der Sprache der Quellen.
+
+Antworte AUSSCHLIESSLICH mit einem JSON-Array in genau diesem Format, ohne Markdown-Codeblock und ohne Text davor oder danach:
+[{"speaker":"A","text":"..."},{"speaker":"B","text":"..."}]
+
+Notebook-Inhalte:
+${context}`;
+
+  const raw = await groqChat(CHAT_MODEL, [{ role: "user", content: prompt }]);
+  return parseAudioScript(raw);
+}
+
+function parseAudioScript(raw: string): AudioScriptLine[] {
+  const start = raw.indexOf("[");
+  const end = raw.lastIndexOf("]");
+  if (start === -1 || end === -1 || end < start) {
+    throw new Error("Skript-Antwort enthielt kein JSON-Array.");
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw.slice(start, end + 1));
+  } catch {
+    throw new Error("Skript-JSON konnte nicht geparst werden.");
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error("Skript-Antwort war kein Array.");
+  }
+
+  const lines = parsed.filter(
+    (item): item is AudioScriptLine =>
+      !!item &&
+      typeof item === "object" &&
+      (item.speaker === "A" || item.speaker === "B") &&
+      typeof item.text === "string" &&
+      item.text.trim().length > 0
+  );
+
+  if (lines.length === 0) {
+    throw new Error("Skript enthielt keine gültigen Gesprächs-Zeilen.");
+  }
+  return lines;
 }
