@@ -14,3 +14,83 @@ export function validateSourceText(text: string): string | null {
   }
   return null;
 }
+
+// Sicherheitsgrenze gegen sehr grosse Seiten (z.B. versehentlich verlinkte
+// Downloads) -- ohne diese Grenze wuerde der komplette HTML-Body erst
+// eingelesen, bevor ueberhaupt geprueft wird, ob die Seite sinnvoll ist.
+const MAX_URL_HTML_BYTES = 5_000_000;
+
+export async function fetchUrlText(
+  url: string
+): Promise<{ text: string; title: string | null }> {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error("Ungültige URL.");
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("Nur http/https-URLs werden unterstützt.");
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(parsed.toString(), {
+      headers: { "User-Agent": "NotebookLM-Klon/1.0 (+Demo-Projekt)" },
+      redirect: "follow",
+    });
+  } catch {
+    throw new Error("Seite nicht erreichbar — URL prüfen.");
+  }
+  if (!res.ok) {
+    throw new Error(`Seite konnte nicht geladen werden (Status ${res.status}).`);
+  }
+
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.includes("html")) {
+    throw new Error(`URL liefert kein HTML (Content-Type: ${contentType || "unbekannt"}).`);
+  }
+
+  const html = await res.text();
+  if (html.length > MAX_URL_HTML_BYTES) {
+    throw new Error("Seite ist zu groß, um verarbeitet zu werden.");
+  }
+
+  const titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
+  const title = titleMatch ? decodeHtmlEntities(titleMatch[1]).trim() : null;
+
+  return { text: htmlToText(html), title };
+}
+
+// Bewusst eine einfache Regex-basierte Extraktion statt einer zusaetzlichen
+// Abhaengigkeit wie jsdom/Readability -- fuer ein Demo-Projekt reicht reiner
+// Fliesstext, ein sauber aufbereiteter Lesemodus ist nicht das Ziel.
+function htmlToText(html: string): string {
+  const withoutJunk = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+    .replace(/<!--[\s\S]*?-->/g, " ");
+
+  const withBreaks = withoutJunk.replace(
+    /<\/(p|div|li|h[1-6]|br|section|article|tr)>/gi,
+    "\n"
+  );
+  const stripped = withBreaks.replace(/<[^>]+>/g, " ");
+  const decoded = decodeHtmlEntities(stripped);
+  return decoded
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n\s*\n+/g, "\n\n")
+    .trim();
+}
+
+function decodeHtmlEntities(input: string): string {
+  return input
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#(\d+);/g, (_, code: string) => String.fromCharCode(parseInt(code, 10)));
+}

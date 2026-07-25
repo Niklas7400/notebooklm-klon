@@ -11,7 +11,7 @@ export function UploadForm({
   onUploaded?: () => void;
 }) {
   const router = useRouter();
-  const [mode, setMode] = useState<"pdf" | "text">("pdf");
+  const [mode, setMode] = useState<"pdf" | "text" | "url">("pdf");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -58,6 +58,13 @@ export function UploadForm({
         >
           Text
         </button>
+        <button
+          type="button"
+          onClick={() => setMode("url")}
+          className={`rounded px-2 py-1 ${mode === "url" ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900" : "bg-neutral-100 dark:bg-neutral-800"}`}
+        >
+          URL
+        </button>
       </div>
 
       {mode === "pdf" ? (
@@ -68,7 +75,7 @@ export function UploadForm({
           required
           className="text-xs text-neutral-500 file:mr-2 file:cursor-pointer file:rounded-md file:border-0 file:bg-neutral-900 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-white hover:file:bg-neutral-700 dark:text-neutral-400 dark:file:bg-white dark:file:text-neutral-900 dark:hover:file:bg-neutral-200"
         />
-      ) : (
+      ) : mode === "text" ? (
         <>
           <input
             type="text"
@@ -84,6 +91,14 @@ export function UploadForm({
             className="rounded border border-neutral-300 px-2 py-1 text-xs dark:border-neutral-700 dark:bg-neutral-900"
           />
         </>
+      ) : (
+        <input
+          type="url"
+          name="url"
+          required
+          placeholder="https://beispiel.de/artikel"
+          className="rounded border border-neutral-300 px-2 py-1 text-xs dark:border-neutral-700 dark:bg-neutral-900"
+        />
       )}
 
       <button

@@ -1,5 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { extractPdfText, validateSourceText } from "@/lib/ingestion";
+import { extractPdfText, fetchUrlText, validateSourceText } from "@/lib/ingestion";
 import { chunkText } from "@/lib/chunking";
 import { embedDocuments } from "@/lib/voyage";
 
@@ -22,6 +22,7 @@ export async function POST(request: Request) {
 
   const file = form.get("file");
   const pastedText = form.get("text");
+  const sourceUrl = form.get("url");
 
   let rawText: string;
   let filename: string;
@@ -50,9 +51,19 @@ export async function POST(request: Request) {
       typeof providedName === "string" && providedName.trim()
         ? providedName.trim()
         : "Eingefügter Text";
+  } else if (typeof sourceUrl === "string" && sourceUrl.trim()) {
+    let fetched: { text: string; title: string | null };
+    try {
+      fetched = await fetchUrlText(sourceUrl.trim());
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "URL konnte nicht geladen werden.";
+      return Response.json({ error: message }, { status: 422 });
+    }
+    rawText = fetched.text;
+    filename = fetched.title ?? sourceUrl.trim();
   } else {
     return Response.json(
-      { error: "Weder Datei noch Text übergeben." },
+      { error: "Weder Datei, Text noch URL übergeben." },
       { status: 400 }
     );
   }
