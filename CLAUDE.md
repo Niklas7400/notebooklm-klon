@@ -118,7 +118,10 @@ create index on chunks using hnsw (embedding vector_cosine_ops);
 -- match_chunks läuft als SECURITY INVOKER, RLS greift also auch beim Aufruf
 -- über den Anon-Key (der ohnehin nirgends im Code verwendet wird). Trotzdem
 -- explizit machen statt sich auf RLS allein zu verlassen:
-revoke execute on function match_chunks(vector, uuid, int, uuid[]) from anon, authenticated;
+-- Achtung: Postgres vergibt EXECUTE beim Anlegen einer Funktion automatisch an
+-- PUBLIC, und jede Rolle (auch anon) ist implizit Mitglied von PUBLIC -- ohne
+-- den Revoke von PUBLIC bliebe der Aufruf ueber den Anon-Key trotzdem moeglich.
+revoke execute on function match_chunks(vector, uuid, int, uuid[]) from public, anon, authenticated;
 ```
 
 **Wichtig:** Der Supabase JS Client (REST-basiert) kann den `<=>`-Operator nicht direkt aufrufen. Dafür braucht es eine Postgres-Funktion, die über `supabase.rpc()` angesprochen wird:

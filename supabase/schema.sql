@@ -89,5 +89,8 @@ $$;
 
 -- match_chunks laeuft als SECURITY INVOKER, RLS greift also auch beim Aufruf
 -- ueber den Anon-Key (der ohnehin nirgends im Code verwendet wird). Trotzdem
--- explizit machen statt sich auf RLS allein zu verlassen:
-revoke execute on function match_chunks(vector, uuid, int, uuid[]) from anon, authenticated;
+-- explizit machen statt sich auf RLS allein zu verlassen. Wichtig: Postgres
+-- vergibt EXECUTE beim Anlegen einer Funktion automatisch an die Pseudo-Rolle
+-- PUBLIC, und jede Rolle (auch anon) ist implizit Mitglied von PUBLIC -- ohne
+-- den expliziten Revoke von PUBLIC bliebe der Aufruf ueber anon trotzdem moeglich.
+revoke execute on function match_chunks(vector, uuid, int, uuid[]) from public, anon, authenticated;
