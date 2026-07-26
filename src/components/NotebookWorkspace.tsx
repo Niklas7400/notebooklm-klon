@@ -27,6 +27,31 @@ export function NotebookWorkspace({
   const [summarizing, setSummarizing] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(true);
   const [chatResetKey, setChatResetKey] = useState(0);
+  const [title, setTitle] = useState(notebook.title);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(notebook.title);
+
+  async function handleRenameSubmit() {
+    const nextTitle = titleDraft.trim();
+    setEditingTitle(false);
+    if (!nextTitle || nextTitle === title) {
+      setTitleDraft(title);
+      return;
+    }
+    const res = await fetch(`/api/notebooks/${notebook.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: nextTitle }),
+    });
+    if (res.ok) {
+      setTitle(nextTitle);
+      router.refresh();
+    } else {
+      setTitleDraft(title);
+      const body = await res.json().catch(() => ({}));
+      alert(body.error ?? "Umbenennen fehlgeschlagen.");
+    }
+  }
 
   function toggleSource(id: string) {
     setExcludedSourceIds((prev) => {
@@ -66,7 +91,7 @@ export function NotebookWorkspace({
   async function handleDeleteNotebook() {
     if (
       !confirm(
-        `Notebook "${notebook.title}" wirklich löschen? Das kann nicht rückgängig gemacht werden.`
+        `Notebook "${title}" wirklich löschen? Das kann nicht rückgängig gemacht werden.`
       )
     )
       return;
@@ -99,7 +124,33 @@ export function NotebookWorkspace({
           <Link href="/" className="text-xs text-neutral-500 hover:underline">
             ← Notebooks
           </Link>
-          <h1 className="mt-1 truncate text-lg font-semibold">{notebook.title}</h1>
+          {editingTitle ? (
+            <input
+              autoFocus
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={handleRenameSubmit}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Escape") {
+                  setTitleDraft(title);
+                  setEditingTitle(false);
+                }
+              }}
+              className="mt-1 w-full rounded border border-neutral-300 px-1 py-0.5 text-lg font-semibold dark:border-neutral-700 dark:bg-neutral-900"
+            />
+          ) : (
+            <h1
+              className="mt-1 cursor-text truncate text-lg font-semibold hover:underline"
+              title="Klicken zum Umbenennen"
+              onClick={() => {
+                setTitleDraft(title);
+                setEditingTitle(true);
+              }}
+            >
+              {title}
+            </h1>
+          )}
         </div>
 
         <div>
