@@ -79,7 +79,12 @@ body {
   }
 }
 
-/* ── Komponenten-Klassen (aus dem Nocturne-Design uebernommen) ── */
+/* ── Komponenten-Klassen (aus dem Nocturne-Design uebernommen) ──
+   In @layer components, damit Tailwind-Utility-Klassen (Layer "utilities")
+   einzelne Eigenschaften ueberschreiben koennen -- ausserhalb eines Layers
+   wuerden diese Regeln jede Utility-Klasse schlagen, unabhaengig von der
+   Reihenfolge im className (Cascade-Layer-Precedence, nicht Spezifitaet). */
+@layer components {
 
 .hr {
   height: 1px;
@@ -302,4 +307,6 @@ textarea.input {
   justify-content: flex-end;
   gap: 5.6px;
   margin-top: 5.6px;
+}
+
 }

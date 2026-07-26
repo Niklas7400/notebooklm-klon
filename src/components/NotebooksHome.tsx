@@ -66,7 +66,7 @@ export function NotebooksHome({ initialNotebooks }: { initialNotebooks: Notebook
             <rect x="1" y="1" width="20" height="20" rx="6" stroke="var(--color-accent)" strokeWidth="1.5" />
             <rect x="8" y="8" width="9" height="9" rx="3" fill="var(--color-accent)" />
           </svg>
-          Klarnote
+          NotebookLM-Klon
         </span>
         <button
           type="button"
