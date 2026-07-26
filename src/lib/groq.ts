@@ -126,6 +126,27 @@ ${context}`;
   return groqChat(CHAT_MODEL, [{ role: "user", content: prompt }]);
 }
 
+// Study Guide (optionales Feature): Kernkonzepte + FAQ auf Knopfdruck, nicht
+// persistiert (im Gegensatz zum Notebook Guide) -- bei Bedarf neu generiert.
+// Genau zwei fest vorgegebene Abschnittsueberschriften statt eines "oder"
+// zwischen Formaten, siehe NOTES.md zum Zusammenfassungs-Prompt-Problem.
+export function generateStudyGuide(context: string): Promise<string> {
+  const prompt = `Erstelle einen Study Guide zu den folgenden Quellen mit GENAU diesen zwei Abschnitten (als Markdown-Ueberschriften):
+
+## Kernkonzepte
+Bullet Points mit den wichtigsten Begriffen/Konzepten aus den Quellen, je Punkt eine kurze Erklaerung.
+
+## Häufige Fragen
+4-6 Frage-Antwort-Paare, die typische Verstaendnisfragen zu den Quellen beantworten. Format: "**F:** ...\\n**A:** ...".
+
+Antworte in der Sprache der Quellen. Nur diese zwei Abschnitte, keine Einleitung und keinen Abschlusssatz davor/danach.
+
+Quellen:
+${context}`;
+
+  return groqChat(CHAT_MODEL, [{ role: "user", content: prompt }]);
+}
+
 // Audio Overview (Tag 8): lockeres Zwei-Personen-Podcast-Skript als JSON.
 // Auf Anfrage generiert, nicht bei jedem Upload (siehe CLAUDE.md) -- TTS hat
 // im Gegensatz zu Groq ein begrenztes Freikontingent.

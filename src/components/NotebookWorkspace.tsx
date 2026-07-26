@@ -6,6 +6,7 @@ import { useState } from "react";
 import { UploadForm } from "@/components/UploadForm";
 import { Chat } from "@/components/Chat";
 import { AudioOverview } from "@/components/AudioOverview";
+import { StudyGuide } from "@/components/StudyGuide";
 import type { Citation, Message, Notebook, Source } from "@/lib/types";
 
 type SourceListItem = Pick<Source, "id" | "filename">;
@@ -176,6 +177,8 @@ export function NotebookWorkspace({
             </ul>
           )}
         </div>
+
+        <StudyGuide notebookId={notebook.id} hasSources={sources.length > 0} />
 
         <AudioOverview
           notebookId={notebook.id}
