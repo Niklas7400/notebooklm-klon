@@ -1,30 +1,41 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { CreateNotebookButton } from "@/components/CreateNotebookButton";
-import { NotebookList } from "@/components/NotebookList";
+import { NotebooksHome } from "@/components/NotebooksHome";
+import { formatRelativeDate, truncate } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
+const EXCERPT_LENGTH = 100;
+
+// Der Supabase-Client kann die eingebettete "sources(count)"-Aggregation
+// nicht aus dem handgepflegten Database-Typ (types.ts) ableiten, da dafuer
+// die Relationships-Metadaten eines vollstaendig generierten Schemas noetig
+// waeren -- daher hier ein lokaler Typ statt Kampf mit den Generics.
+type NotebookWithSourceCount = {
+  id: string;
+  title: string;
+  is_demo: boolean;
+  summary: string | null;
+  created_at: string;
+  sources: { count: number }[];
+};
+
 export default async function Home() {
   const supabase = createAdminClient();
-  const { data: notebooks } = await supabase
+  const { data } = await supabase
     .from("notebooks")
-    .select("*")
+    .select("id, title, is_demo, summary, created_at, sources(count)")
     .order("created_at", { ascending: false });
 
-  return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-16">
-      <div className="flex items-center justify-between">
-        <h1 className="font-heading text-2xl font-semibold">Notebooks</h1>
-        <CreateNotebookButton />
-      </div>
+  const notebooks = (data ?? []) as unknown as NotebookWithSourceCount[];
 
-      {!notebooks || notebooks.length === 0 ? (
-        <p className="text-sm text-neutral-500">
-          Noch kein Notebook vorhanden. Lege eines an, um Quellen hochzuladen.
-        </p>
-      ) : (
-        <NotebookList notebooks={notebooks} />
-      )}
-    </main>
-  );
+  const cards = notebooks.map((nb) => ({
+    id: nb.id,
+    title: nb.title,
+    isDemo: nb.is_demo,
+    excerpt: nb.summary ? truncate(nb.summary, EXCERPT_LENGTH) : "Noch keine Quellen hochgeladen.",
+    sourceCount: nb.sources?.[0]?.count ?? 0,
+    relDate: formatRelativeDate(nb.created_at),
+  }));
+
+  return <NotebooksHome initialNotebooks={cards} />;
 }
