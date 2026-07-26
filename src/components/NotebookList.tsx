@@ -29,22 +29,18 @@ export function NotebookList({ notebooks }: { notebooks: Notebook[] }) {
       {notebooks.map((nb) => (
         <li
           key={nb.id}
-          className="flex items-center gap-2 rounded-md border border-neutral-200 px-4 py-3 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
+          className="flex items-center gap-2 rounded-md border border-divider px-4 py-3 hover:bg-surface"
         >
-          <Link href={`/notebook/${nb.id}`} className="min-w-0 flex-1">
+          <Link href={`/notebook/${nb.id}`} className="min-w-0 flex-1 text-text no-underline">
             <span className="font-medium">{nb.title}</span>
-            {nb.is_demo && (
-              <span className="ml-2 rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
-                Demo
-              </span>
-            )}
+            {nb.is_demo && <span className="tag tag-accent ml-2">Demo</span>}
           </Link>
           <button
             type="button"
             onClick={() => handleDelete(nb)}
             disabled={nb.is_demo}
             title={nb.is_demo ? "Das Demo-Notebook kann nicht gelöscht werden." : "Notebook löschen"}
-            className="shrink-0 rounded px-2 py-1 text-xs text-neutral-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:hover:bg-red-950 dark:hover:text-red-400"
+            className="shrink-0 cursor-pointer rounded border-0 bg-transparent px-2 py-1 text-xs text-neutral-500 hover:text-danger disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-neutral-500"
           >
             ✕
           </button>

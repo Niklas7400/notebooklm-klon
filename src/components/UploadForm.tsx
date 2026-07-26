@@ -6,9 +6,11 @@ import { useRef, useState } from "react";
 export function UploadForm({
   notebookId,
   onUploaded,
+  onCancel,
 }: {
   notebookId: string;
   onUploaded?: () => void;
+  onCancel: () => void;
 }) {
   const router = useRouter();
   const [mode, setMode] = useState<"pdf" | "text" | "url">("pdf");
@@ -42,74 +44,82 @@ export function UploadForm({
   }
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-2">
-      <div className="flex gap-1 text-xs">
-        <button
-          type="button"
-          onClick={() => setMode("pdf")}
-          className={`rounded px-2 py-1 ${mode === "pdf" ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900" : "bg-neutral-100 dark:bg-neutral-800"}`}
-        >
+    <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-3">
+      <div className="seg">
+        <label className="seg-opt">
+          <input
+            type="radio"
+            name="mode"
+            checked={mode === "pdf"}
+            onChange={() => setMode("pdf")}
+          />
           PDF
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("text")}
-          className={`rounded px-2 py-1 ${mode === "text" ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900" : "bg-neutral-100 dark:bg-neutral-800"}`}
-        >
+        </label>
+        <label className="seg-opt">
+          <input
+            type="radio"
+            name="mode"
+            checked={mode === "text"}
+            onChange={() => setMode("text")}
+          />
           Text
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("url")}
-          className={`rounded px-2 py-1 ${mode === "url" ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900" : "bg-neutral-100 dark:bg-neutral-800"}`}
-        >
+        </label>
+        <label className="seg-opt">
+          <input
+            type="radio"
+            name="mode"
+            checked={mode === "url"}
+            onChange={() => setMode("url")}
+          />
           URL
-        </button>
+        </label>
       </div>
 
       {mode === "pdf" ? (
-        <input
-          type="file"
-          name="file"
-          accept="application/pdf"
-          required
-          className="text-xs text-neutral-500 file:mr-2 file:cursor-pointer file:rounded-md file:border-0 file:bg-neutral-900 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-white hover:file:bg-neutral-700 dark:text-neutral-400 dark:file:bg-white dark:file:text-neutral-900 dark:hover:file:bg-neutral-200"
-        />
+        <div className="field">
+          <label>PDF-Datei</label>
+          <input type="file" name="file" accept="application/pdf" required className="input" />
+        </div>
       ) : mode === "text" ? (
         <>
-          <input
-            type="text"
-            name="filename"
-            placeholder="Titel (optional)"
-            className="rounded border border-neutral-300 px-2 py-1 text-xs dark:border-neutral-700 dark:bg-neutral-900"
-          />
-          <textarea
-            name="text"
-            required
-            rows={4}
-            placeholder="Text einfügen…"
-            className="rounded border border-neutral-300 px-2 py-1 text-xs dark:border-neutral-700 dark:bg-neutral-900"
-          />
+          <div className="field">
+            <label>Titel (optional)</label>
+            <input type="text" name="filename" placeholder="Titel" className="input" />
+          </div>
+          <div className="field">
+            <label>Text</label>
+            <textarea
+              name="text"
+              required
+              rows={4}
+              placeholder="Text einfügen…"
+              className="input"
+            />
+          </div>
         </>
       ) : (
-        <input
-          type="url"
-          name="url"
-          required
-          placeholder="https://beispiel.de/artikel"
-          className="rounded border border-neutral-300 px-2 py-1 text-xs dark:border-neutral-700 dark:bg-neutral-900"
-        />
+        <div className="field">
+          <label>URL</label>
+          <input
+            type="url"
+            name="url"
+            required
+            placeholder="https://beispiel.de/artikel"
+            className="input"
+          />
+        </div>
       )}
 
-      <button
-        type="submit"
-        disabled={pending}
-        className="rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-700 disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
-      >
-        {pending ? "Wird hochgeladen…" : "Hochladen"}
-      </button>
+      {error && <p className="text-xs text-danger">{error}</p>}
 
-      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+      <div className="dialog-actions">
+        <button type="button" className="btn btn-secondary" onClick={onCancel}>
+          Abbrechen
+        </button>
+        <button type="submit" className="btn btn-primary" disabled={pending}>
+          {pending ? "Wird hochgeladen…" : "Hochladen"}
+        </button>
+      </div>
     </form>
   );
 }

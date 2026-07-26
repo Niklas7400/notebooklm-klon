@@ -23,7 +23,7 @@ function renderContent(
         key={`c-${key++}`}
         type="button"
         onClick={() => onCitationClick(citation)}
-        className="mx-0.5 rounded bg-neutral-300 px-1.5 py-0.5 text-xs font-medium text-neutral-700 hover:bg-neutral-400 dark:bg-neutral-600 dark:text-neutral-100 dark:hover:bg-neutral-500"
+        className="mx-0.5 inline-flex rounded-[5px] border-0 bg-accent-800 px-1.5 py-px text-[11px] font-medium text-accent-100"
       >
         {segment.localId}
       </button>
@@ -36,13 +36,17 @@ export function Chat({
   initialMessages,
   sourceIds,
   suggestedQuestions,
+  selectedCitation,
   onCitationClick,
+  onCloseCitation,
 }: {
   notebookId: string;
   initialMessages: Message[];
   sourceIds: string[] | null;
   suggestedQuestions?: string[];
+  selectedCitation: Citation | null;
   onCitationClick: (citation: Citation) => void;
+  onCloseCitation: () => void;
 }) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
@@ -134,10 +138,10 @@ export function Chat({
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto px-8 py-7">
         {messages.length === 0 ? (
-          <div className="flex flex-col gap-3">
-            <p className="text-sm text-neutral-500">
+          <div className="flex max-w-xl flex-col gap-4">
+            <p className="m-0 text-sm text-neutral-400">
               Stelle eine Frage zu den hochgeladenen Quellen.
             </p>
             {suggestedQuestions && suggestedQuestions.length > 0 && (
@@ -148,7 +152,7 @@ export function Chat({
                     type="button"
                     onClick={() => submitQuestion(q)}
                     disabled={pending}
-                    className="rounded-md border border-neutral-300 px-3 py-1.5 text-left text-sm text-neutral-700 hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                    className="btn btn-secondary text-left font-normal"
                   >
                     {q}
                   </button>
@@ -157,14 +161,14 @@ export function Chat({
             )}
           </div>
         ) : (
-          <ul className="flex flex-col gap-4">
+          <ul className="flex max-w-3xl flex-col gap-3.5">
             {messages.map((m) => (
-              <li key={m.id} className={m.role === "user" ? "text-right" : "text-left"}>
+              <li key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div
-                  className={`inline-block max-w-[80%] whitespace-pre-wrap rounded-lg px-3 py-2 text-left text-sm ${
+                  className={`max-w-[80%] whitespace-pre-wrap rounded-[14px] px-3.5 py-2.5 text-sm leading-[1.55] ${
                     m.role === "user"
-                      ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
-                      : "bg-neutral-100 dark:bg-neutral-800"
+                      ? "bg-accent-800 text-accent-100"
+                      : "border border-divider bg-surface text-text"
                   }`}
                 >
                   {renderContent(m.content, m.citations, onCitationClick)}
@@ -175,28 +179,53 @@ export function Chat({
         )}
       </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className="flex gap-2 border-t border-neutral-200 p-4 dark:border-neutral-800"
-      >
+      {selectedCitation && (
+        <div className="border-t border-divider bg-surface px-8 py-2.5">
+          <div className="mb-1.5 flex max-w-3xl items-center justify-between gap-2">
+            <span className="truncate text-xs font-medium" title={selectedCitation.filename}>
+              {selectedCitation.filename}
+            </span>
+            <button
+              type="button"
+              onClick={onCloseCitation}
+              className="shrink-0 cursor-pointer border-0 bg-transparent text-neutral-500 hover:text-neutral-300"
+              aria-label="Schließen"
+            >
+              ✕
+            </button>
+          </div>
+          <p className="m-0 max-w-3xl text-[12.5px] leading-[1.6] text-neutral-400">
+            {selectedCitation.snippet}
+          </p>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="flex shrink-0 gap-2.5 border-t border-divider px-8 py-4">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Frage stellen…"
-          className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+          className="input max-w-3xl"
         />
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
-        >
-          {pending ? "…" : "Senden"}
+        <button type="submit" disabled={pending} className="btn btn-primary shrink-0">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M22 2L11 13" />
+            <path d="M22 2l-7 20-4-9-9-4z" />
+          </svg>
+          Senden
         </button>
       </form>
       {error && (
-        <p className="border-t border-neutral-200 px-4 py-2 text-xs text-red-600 dark:border-neutral-800 dark:text-red-400">
-          {error}
-        </p>
+        <p className="border-t border-divider px-8 py-2 text-xs text-danger">{error}</p>
       )}
     </div>
   );

@@ -9,12 +9,12 @@ function renderMarkdownLite(text: string): ReactNode[] {
   return text.split("\n").map((line, i) => {
     if (line.startsWith("## ")) {
       return (
-        <h3
+        <h6
           key={i}
-          className="mt-3 text-xs font-semibold uppercase tracking-wide text-neutral-500 first:mt-0"
+          className="mt-2.5 mb-1 text-neutral-500 first:mt-0"
         >
           {line.slice(3)}
-        </h3>
+        </h6>
       );
     }
     if (!line.trim()) return <div key={i} className="h-1" />;
@@ -29,7 +29,7 @@ function renderMarkdownLite(text: string): ReactNode[] {
         )
       );
     return (
-      <p key={i} className="text-xs text-neutral-600 dark:text-neutral-400">
+      <p key={i} className="m-0 mb-1.5 text-[12.5px] leading-[1.55] text-neutral-300">
         {parts}
       </p>
     );
@@ -70,33 +70,33 @@ export function StudyGuide({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+        <h6 className="m-0 text-[11px] tracking-[0.08em] text-neutral-400 uppercase">
           Study Guide &amp; FAQ
-        </h2>
+        </h6>
         <button
           type="button"
           onClick={handleGenerate}
           disabled={!hasSources || loading}
-          className="rounded border border-neutral-300 px-2 py-1 text-xs font-medium text-neutral-600 hover:border-neutral-400 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
+          className="btn btn-ghost text-[11px]"
         >
           {loading ? "Wird generiert…" : studyGuide ? "Neu generieren" : "Generieren"}
         </button>
       </div>
 
-      {!hasSources && <p className="text-xs text-neutral-500">Erst eine Quelle hochladen.</p>}
-      {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {!hasSources && <p className="m-0 text-xs text-neutral-500">Erst eine Quelle hochladen.</p>}
+      {error && <p className="m-0 text-xs text-danger">{error}</p>}
 
       {studyGuide && (
         <>
           <button
             type="button"
             onClick={() => setOpen((o) => !o)}
-            className="mb-1 text-[10px] text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+            className="mb-1 cursor-pointer border-0 bg-transparent p-0 text-[11px] text-neutral-500 hover:text-neutral-300"
           >
             {open ? "Einklappen" : "Anzeigen"}
           </button>
           {open && (
-            <div className="max-h-64 overflow-y-auto rounded border border-neutral-200 p-2 dark:border-neutral-800">
+            <div className="max-h-56 overflow-y-auto rounded-md border border-divider p-2.5">
               {renderMarkdownLite(studyGuide)}
             </div>
           )}

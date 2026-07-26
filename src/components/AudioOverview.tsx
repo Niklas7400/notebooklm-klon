@@ -98,14 +98,14 @@ export function AudioOverview({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+        <h6 className="m-0 text-[11px] tracking-[0.08em] text-neutral-400 uppercase">
           Audio Overview
-        </h2>
+        </h6>
         <button
           type="button"
           onClick={handleGenerate}
           disabled={!hasSources || generating || status === "generating"}
-          className="rounded border border-neutral-300 px-2 py-1 text-xs font-medium text-neutral-600 hover:border-neutral-400 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
+          className="btn btn-ghost text-[11px]"
         >
           {generating
             ? "Wird generiert…"
@@ -116,52 +116,54 @@ export function AudioOverview({
       </div>
 
       {generating && (
-        <p className="text-xs text-neutral-500">
-          Podcast-Gespräch wird erstellt — kann bis zu einer Minute dauern…
+        <p className="m-0 text-xs text-accent-300">
+          <span className="inline-block animate-[pulse_1.4s_ease-in-out_infinite]">
+            Podcast-Gespräch wird erstellt…
+          </span>
         </p>
       )}
-      {!generating && error && (
-        <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
-      )}
+      {!generating && error && <p className="m-0 text-xs text-danger">{error}</p>}
       {!generating && !error && !hasSources && (
-        <p className="text-xs text-neutral-500">Erst eine Quelle hochladen.</p>
+        <p className="m-0 text-xs text-neutral-500">Erst eine Quelle hochladen.</p>
       )}
       {!generating && !error && hasSources && status === "none" && (
-        <p className="text-xs text-neutral-500">
-          Noch kein Audio Overview generiert.
-        </p>
+        <p className="m-0 text-xs text-neutral-500">Noch kein Audio Overview generiert.</p>
       )}
 
       {script && clipUrls && status === "ready" && (
         <div className="mt-2 flex flex-col gap-2">
           <audio ref={audioRef} onEnded={handleEnded} className="hidden" />
-          <button
-            type="button"
-            onClick={handlePlayPause}
-            className="self-start rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
-          >
-            {isPlaying ? "⏸ Pause" : "▶ Abspielen"}
+          <button type="button" onClick={handlePlayPause} className="btn btn-primary self-start">
+            {isPlaying ? (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="5" width="4" height="14" />
+                <rect x="14" y="5" width="4" height="14" />
+              </svg>
+            ) : (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            )}
+            {isPlaying ? "Pause" : "Abspielen"}
           </button>
-          <ul className="flex max-h-56 flex-col gap-1 overflow-y-auto text-xs">
+          <div className="flex max-h-56 flex-col gap-1 overflow-y-auto">
             {script.map((line, i) => (
-              <li
+              <div
                 key={i}
-                className={`rounded px-2 py-1 ${
-                  i === currentIndex
-                    ? "bg-neutral-200 dark:bg-neutral-700"
-                    : "bg-neutral-50 dark:bg-neutral-900"
+                className={`rounded-sm px-2 py-1.5 text-xs ${
+                  i === currentIndex ? "bg-accent-800" : "bg-transparent"
                 }`}
               >
-                <span className="font-medium">
-                  {line.speaker === "A" ? "Host A" : "Host B"}:
-                </span>{" "}
-                {line.text}
+                <span className="font-medium text-accent-300">
+                  {line.speaker === "A" ? "Host A" : "Host B"}:{" "}
+                </span>
+                <span className="text-neutral-300">{line.text}</span>
                 {!clipUrls[i] && (
-                  <span className="ml-1 text-neutral-400">(Audio nicht verfügbar)</span>
+                  <span className="ml-1 text-neutral-500">(Audio nicht verfügbar)</span>
                 )}
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
         </div>
       )}
     </div>

@@ -24,11 +24,7 @@ export function CreateNotebookButton() {
   }
 
   return (
-    <button
-      onClick={handleClick}
-      disabled={pending}
-      className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-700 disabled:opacity-50 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
-    >
+    <button onClick={handleClick} disabled={pending} className="btn btn-primary">
       {pending ? "Wird angelegt…" : "+ Neues Notebook"}
     </button>
   );

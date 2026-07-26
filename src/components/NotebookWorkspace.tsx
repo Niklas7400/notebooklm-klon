@@ -7,9 +7,24 @@ import { UploadForm } from "@/components/UploadForm";
 import { Chat } from "@/components/Chat";
 import { AudioOverview } from "@/components/AudioOverview";
 import { StudyGuide } from "@/components/StudyGuide";
+import { Dialog } from "@/components/Dialog";
 import type { Citation, Message, Notebook, Source } from "@/lib/types";
 
 type SourceListItem = Pick<Source, "id" | "filename">;
+
+type SourceKind = "pdf" | "url" | "text";
+
+function getSourceKind(filename: string): SourceKind {
+  if (/^https?:\/\//i.test(filename)) return "url";
+  if (filename.toLowerCase().endsWith(".pdf")) return "pdf";
+  return "text";
+}
+
+const SOURCE_ICON_PATHS: Record<SourceKind, string> = {
+  pdf: "M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z",
+  url: "M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1",
+  text: "M4 6h16M4 12h16M4 18h10",
+};
 
 export function NotebookWorkspace({
   notebook,
@@ -35,6 +50,9 @@ export function NotebookWorkspace({
   const [title, setTitle] = useState(notebook.title);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(notebook.title);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [resetChatOpen, setResetChatOpen] = useState(false);
+  const [deleteNotebookOpen, setDeleteNotebookOpen] = useState(false);
 
   async function handleRenameSubmit() {
     const nextTitle = titleDraft.trim();
@@ -68,6 +86,7 @@ export function NotebookWorkspace({
   }
 
   async function handleUploaded() {
+    setUploadOpen(false);
     setSummarizing(true);
     try {
       const res = await fetch(`/api/notebooks/${notebook.id}/summary`, { method: "POST" });
@@ -92,7 +111,6 @@ export function NotebookWorkspace({
   }
 
   async function handleDeleteSource(sourceId: string) {
-    if (!confirm("Diese Quelle wirklich löschen?")) return;
     const res = await fetch(`/api/sources/${sourceId}`, { method: "DELETE" });
     if (res.ok) {
       setExcludedSourceIds((prev) => {
@@ -100,6 +118,7 @@ export function NotebookWorkspace({
         next.delete(sourceId);
         return next;
       });
+      if (viewingSource) setViewingSource(null);
       router.refresh();
     }
   }
@@ -111,25 +130,20 @@ export function NotebookWorkspace({
     }
   }
 
-  async function handleDeleteNotebook() {
-    if (
-      !confirm(
-        `Notebook "${title}" wirklich löschen? Das kann nicht rückgängig gemacht werden.`
-      )
-    )
-      return;
+  async function confirmDeleteNotebook() {
     const res = await fetch(`/api/notebooks/${notebook.id}`, { method: "DELETE" });
     if (res.ok) {
       router.push("/");
     } else {
+      setDeleteNotebookOpen(false);
       const body = await res.json().catch(() => ({}));
       alert(body.error ?? "Löschen fehlgeschlagen.");
     }
   }
 
-  async function handleResetChat() {
-    if (!confirm("Chatverlauf für dieses Notebook wirklich zurücksetzen?")) return;
+  async function confirmResetChat() {
     const res = await fetch(`/api/notebooks/${notebook.id}/messages`, { method: "DELETE" });
+    setResetChatOpen(false);
     if (res.ok) {
       setChatResetKey((k) => k + 1);
     }
@@ -141,215 +155,353 @@ export function NotebookWorkspace({
       : sources.filter((s) => !excludedSourceIds.has(s.id)).map((s) => s.id);
 
   return (
-    <div className="flex flex-1 overflow-hidden">
-      <aside className="flex w-72 shrink-0 flex-col gap-4 overflow-y-auto border-r border-neutral-200 p-4 dark:border-neutral-800">
-        <div>
-          <Link href="/" className="text-xs text-neutral-500 hover:underline">
-            ← Notebooks
-          </Link>
-          {editingTitle ? (
-            <input
-              autoFocus
-              value={titleDraft}
-              onChange={(e) => setTitleDraft(e.target.value)}
-              onBlur={handleRenameSubmit}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") e.currentTarget.blur();
-                if (e.key === "Escape") {
-                  setTitleDraft(title);
-                  setEditingTitle(false);
-                }
-              }}
-              className="mt-1 w-full rounded border border-neutral-300 px-1 py-0.5 text-lg font-semibold dark:border-neutral-700 dark:bg-neutral-900"
-            />
-          ) : (
-            <div
-              className="group mt-1 flex min-w-0 cursor-text items-center gap-1.5"
-              title="Klicken zum Umbenennen"
-              onClick={() => {
-                setTitleDraft(title);
-                setEditingTitle(true);
-              }}
-            >
-              <h1 className="truncate text-lg font-semibold">{title}</h1>
-              <span className="shrink-0 text-sm text-neutral-400 opacity-0 transition-opacity group-hover:opacity-100">
-                ✎
-              </span>
-            </div>
-          )}
-        </div>
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <nav className="flex shrink-0 items-center gap-3 border-b border-divider px-4 py-3">
+        <Link
+          href="/"
+          className="flex items-center gap-1.5 text-[13px] text-neutral-400 no-underline hover:text-accent"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+          Notebooks
+        </Link>
+        <div className="h-[18px] w-px bg-divider" />
 
-        <div>
-          <div className="mb-2 flex items-center justify-between">
+        {editingTitle ? (
+          <input
+            autoFocus
+            value={titleDraft}
+            onChange={(e) => setTitleDraft(e.target.value)}
+            onBlur={handleRenameSubmit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+              if (e.key === "Escape") {
+                setTitleDraft(title);
+                setEditingTitle(false);
+              }
+            }}
+            className="input w-[280px] font-heading text-[15px]"
+          />
+        ) : (
+          <button
+            type="button"
+            className="btn btn-ghost gap-2"
+            style={{ color: "var(--color-text)", fontFamily: "var(--font-heading)", fontSize: "15px" }}
+            onClick={() => {
+              setTitleDraft(title);
+              setEditingTitle(true);
+            }}
+            title="Titel bearbeiten"
+          >
+            {title}
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--color-neutral-500)"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+            </svg>
+          </button>
+        )}
+
+        {notebook.is_demo && <span className="tag tag-accent">Demo</span>}
+
+        <div className="ml-auto flex items-center gap-2">
+          <button type="button" className="btn btn-secondary" onClick={() => setResetChatOpen(true)}>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3 12a9 9 0 1 0 3-6.7" />
+              <path d="M3 4v5h5" />
+            </svg>
+            Chat zurücksetzen
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ color: "var(--color-danger)" }}
+            disabled={notebook.is_demo}
+            title={notebook.is_demo ? "Das Demo-Notebook kann nicht gelöscht werden." : undefined}
+            onClick={() => setDeleteNotebookOpen(true)}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M4 7h16" />
+              <path d="M10 11v6M14 11v6" />
+              <path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" />
+            </svg>
+            Löschen
+          </button>
+        </div>
+      </nav>
+
+      <div className="flex flex-1 overflow-hidden">
+        <aside className="flex w-80 shrink-0 flex-col gap-[22px] overflow-y-auto p-5">
+          <div>
             <button
               type="button"
               onClick={() => setSummaryOpen((open) => !open)}
-              className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+              className="flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 font-heading text-[11px] tracking-[0.08em] text-neutral-400 uppercase"
               aria-expanded={summaryOpen}
             >
-              <span className={`inline-block transition-transform ${summaryOpen ? "rotate-90" : ""}`}>
-                ▶
-              </span>
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`transition-transform ${summaryOpen ? "rotate-90" : ""}`}
+              >
+                <path d="M9 18l6-6-6-6" />
+              </svg>
               Zusammenfassung
             </button>
             {summarizing && (
-              <span className="text-[10px] text-neutral-400">wird aktualisiert…</span>
+              <p className="mt-1 mb-0 text-[10px] text-neutral-500">wird aktualisiert…</p>
             )}
+            {summaryOpen &&
+              (summary ? (
+                <p className="mt-2.5 mb-0 text-[13px] leading-[1.6] text-neutral-300">{summary}</p>
+              ) : (
+                <p className="mt-2.5 mb-0 text-xs text-neutral-500">
+                  {summarizing ? "Wird erstellt…" : "Noch keine Zusammenfassung."}
+                </p>
+              ))}
           </div>
-          {summaryOpen &&
-            (summary ? (
-              <p className="whitespace-pre-wrap text-xs text-neutral-600 dark:text-neutral-400">
-                {summary}
-              </p>
-            ) : (
-              <p className="text-xs text-neutral-500">
-                {summarizing ? "Wird erstellt…" : "Noch keine Zusammenfassung."}
-              </p>
-            ))}
-        </div>
 
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-xs font-medium uppercase tracking-wide text-neutral-500">
-              Quellen
-            </h2>
-            {sources.length > 0 && (
-              <button
-                type="button"
-                onClick={handleResetChat}
-                className="rounded border border-neutral-300 px-2 py-1 text-xs font-medium text-neutral-600 hover:border-neutral-400 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-800"
-              >
-                Chat zurücksetzen
-              </button>
+          <div className="hr" />
+
+          <div>
+            <h6 className="m-0 mb-2.5 text-neutral-400">Quellen · {sources.length}</h6>
+            {sources.length === 0 ? (
+              <p className="m-0 text-xs text-neutral-500">Noch keine Quelle hochgeladen.</p>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {sources.map((s) => {
+                  const kind = getSourceKind(s.filename);
+                  return (
+                    <div
+                      key={s.id}
+                      className="flex items-center gap-2 rounded-md border border-divider px-2 py-1.5"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={!excludedSourceIds.has(s.id)}
+                        onChange={() => toggleSource(s.id)}
+                        className="shrink-0 cursor-pointer accent-accent"
+                        title="In die Suche einbeziehen"
+                      />
+                      <svg
+                        width="13"
+                        height="13"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="var(--color-neutral-500)"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="shrink-0"
+                      >
+                        <path d={SOURCE_ICON_PATHS[kind]} />
+                      </svg>
+                      <button
+                        type="button"
+                        onClick={() => handleViewSource(s.id)}
+                        className="min-w-0 flex-1 cursor-pointer truncate border-0 bg-transparent p-0 text-left text-[12.5px] text-text"
+                        title={`${s.filename} — Volltext anzeigen`}
+                      >
+                        {s.filename}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSource(s.id)}
+                        className="shrink-0 cursor-pointer border-0 bg-transparent p-0.5 text-neutral-600 hover:text-danger"
+                        aria-label={`${s.filename} löschen`}
+                      >
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                        >
+                          <path d="M18 6L6 18M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             )}
-          </div>
-          {sources.length === 0 ? (
-            <p className="text-xs text-neutral-500">Noch keine Quelle hochgeladen.</p>
-          ) : (
-            <ul className="flex flex-col gap-1">
-              {sources.map((s) => (
-                <li
-                  key={s.id}
-                  className="flex items-center gap-2 rounded border border-neutral-200 px-2 py-1.5 text-xs dark:border-neutral-800"
-                >
-                  <input
-                    type="checkbox"
-                    checked={!excludedSourceIds.has(s.id)}
-                    onChange={() => toggleSource(s.id)}
-                    title="Diese Quelle in die Suche einbeziehen"
-                  />
+
+            {viewingSource && (
+              <div className="mt-2 rounded-md border border-divider bg-surface p-2.5">
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <span className="truncate text-xs font-medium" title={viewingSource.filename}>
+                    {viewingSource.filename}
+                  </span>
                   <button
                     type="button"
-                    onClick={() => handleViewSource(s.id)}
-                    className="min-w-0 flex-1 truncate text-left hover:underline"
-                    title={`${s.filename} — Volltext anzeigen`}
-                  >
-                    {s.filename}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteSource(s.id)}
-                    className="shrink-0 text-neutral-400 hover:text-red-600 dark:hover:text-red-400"
-                    aria-label={`${s.filename} löschen`}
+                    onClick={() => setViewingSource(null)}
+                    className="shrink-0 cursor-pointer border-0 bg-transparent text-neutral-500 hover:text-neutral-300"
+                    aria-label="Schließen"
                   >
                     ✕
                   </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+                </div>
+                <p className="m-0 max-h-40 overflow-y-auto text-xs leading-[1.6] whitespace-pre-wrap text-neutral-400">
+                  {viewingSource.raw_text}
+                </p>
+              </div>
+            )}
 
-        <StudyGuide notebookId={notebook.id} hasSources={sources.length > 0} />
-
-        <AudioOverview
-          notebookId={notebook.id}
-          hasSources={sources.length > 0}
-          initialScript={notebook.audio_script}
-          initialClipUrls={notebook.audio_clip_urls}
-          initialStatus={notebook.audio_status}
-        />
-
-        {viewingSource && (
-          <div className="rounded border border-neutral-200 p-3 text-xs dark:border-neutral-800">
-            <div className="mb-1 flex items-center justify-between gap-2">
-              <span className="truncate font-medium" title={viewingSource.filename}>
-                {viewingSource.filename}
-              </span>
-              <button
-                type="button"
-                onClick={() => setViewingSource(null)}
-                className="shrink-0 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
-                aria-label="Schließen"
+            <button
+              type="button"
+              className="btn btn-secondary btn-block mt-2.5"
+              onClick={() => setUploadOpen(true)}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               >
-                ✕
-              </button>
-            </div>
-            <p className="max-h-64 overflow-y-auto whitespace-pre-wrap text-neutral-600 dark:text-neutral-400">
-              {viewingSource.raw_text}
-            </p>
-          </div>
-        )}
-
-        {selectedCitation && (
-          <div className="rounded border border-neutral-200 p-3 text-xs dark:border-neutral-800">
-            <div className="mb-1 flex items-center justify-between gap-2">
-              <span className="truncate font-medium" title={selectedCitation.filename}>
-                {selectedCitation.filename}
-              </span>
-              <button
-                type="button"
-                onClick={() => setSelectedCitation(null)}
-                className="shrink-0 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
-                aria-label="Schließen"
-              >
-                ✕
-              </button>
-            </div>
-            <p className="max-h-64 overflow-y-auto whitespace-pre-wrap text-neutral-600 dark:text-neutral-400">
-              {selectedCitation.snippet}
-            </p>
-          </div>
-        )}
-
-        <div className="mt-auto flex flex-col gap-4 border-t border-neutral-200 pt-4 dark:border-neutral-800">
-          <div>
-            <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
+                <path d="M12 3v12" />
+                <path d="M6.5 9L12 3.5 17.5 9" />
+                <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+              </svg>
               Quelle hinzufügen
-            </h2>
-            <UploadForm notebookId={notebook.id} onUploaded={handleUploaded} />
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={handleDeleteNotebook}
-            disabled={notebook.is_demo}
-            title={notebook.is_demo ? "Das Demo-Notebook kann nicht gelöscht werden." : undefined}
-            className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
-          >
-            Notebook löschen
-          </button>
-        </div>
-      </aside>
+          <div className="hr" />
 
-      <main className="flex flex-1 flex-col overflow-hidden">
-        {sources.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center p-8">
-            <p className="text-sm text-neutral-500">
-              Lade zuerst eine Quelle hoch, um Fragen stellen zu können.
-            </p>
-          </div>
-        ) : (
-          <Chat
-            key={chatResetKey}
+          <StudyGuide notebookId={notebook.id} hasSources={sources.length > 0} />
+
+          <div className="hr" />
+
+          <AudioOverview
             notebookId={notebook.id}
-            initialMessages={chatResetKey === 0 ? initialMessages : []}
-            sourceIds={activeSourceIds}
-            suggestedQuestions={suggestedQuestions}
-            onCitationClick={setSelectedCitation}
+            hasSources={sources.length > 0}
+            initialScript={notebook.audio_script}
+            initialClipUrls={notebook.audio_clip_urls}
+            initialStatus={notebook.audio_status}
           />
-        )}
-      </main>
+        </aside>
+
+        <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          {sources.length === 0 ? (
+            <div className="flex flex-1 items-center justify-center p-8">
+              <p className="text-sm text-neutral-500">
+                Lade zuerst eine Quelle hoch, um Fragen stellen zu können.
+              </p>
+            </div>
+          ) : (
+            <Chat
+              key={chatResetKey}
+              notebookId={notebook.id}
+              initialMessages={chatResetKey === 0 ? initialMessages : []}
+              sourceIds={activeSourceIds}
+              suggestedQuestions={suggestedQuestions}
+              selectedCitation={selectedCitation}
+              onCitationClick={setSelectedCitation}
+              onCloseCitation={() => setSelectedCitation(null)}
+            />
+          )}
+        </main>
+      </div>
+
+      <Dialog open={uploadOpen} onClose={() => setUploadOpen(false)} title="Quelle hinzufügen">
+        <UploadForm
+          notebookId={notebook.id}
+          onUploaded={handleUploaded}
+          onCancel={() => setUploadOpen(false)}
+        />
+      </Dialog>
+
+      <Dialog
+        open={resetChatOpen}
+        onClose={() => setResetChatOpen(false)}
+        title="Chatverlauf zurücksetzen?"
+        actions={
+          <>
+            <button className="btn btn-secondary" onClick={() => setResetChatOpen(false)}>
+              Abbrechen
+            </button>
+            <button
+              className="btn btn-secondary"
+              style={{ color: "var(--color-danger)" }}
+              onClick={confirmResetChat}
+            >
+              Zurücksetzen
+            </button>
+          </>
+        }
+      >
+        Der bisherige Chatverlauf für dieses Notebook wird gelöscht.
+      </Dialog>
+
+      <Dialog
+        open={deleteNotebookOpen}
+        onClose={() => setDeleteNotebookOpen(false)}
+        title="Notebook löschen?"
+        actions={
+          <>
+            <button className="btn btn-secondary" onClick={() => setDeleteNotebookOpen(false)}>
+              Abbrechen
+            </button>
+            <button
+              className="btn btn-secondary"
+              style={{ color: "var(--color-danger)" }}
+              onClick={confirmDeleteNotebook}
+            >
+              Löschen
+            </button>
+          </>
+        }
+      >
+        „{title}“ wird unwiderruflich gelöscht, inklusive aller Quellen und des Chatverlaufs.
+      </Dialog>
     </div>
   );
 }
