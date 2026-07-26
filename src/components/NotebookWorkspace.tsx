@@ -163,16 +163,19 @@ export function NotebookWorkspace({
               className="mt-1 w-full rounded border border-neutral-300 px-1 py-0.5 text-lg font-semibold dark:border-neutral-700 dark:bg-neutral-900"
             />
           ) : (
-            <h1
-              className="mt-1 cursor-text truncate text-lg font-semibold hover:underline"
+            <div
+              className="group mt-1 flex min-w-0 cursor-text items-center gap-1.5"
               title="Klicken zum Umbenennen"
               onClick={() => {
                 setTitleDraft(title);
                 setEditingTitle(true);
               }}
             >
-              {title}
-            </h1>
+              <h1 className="truncate text-lg font-semibold">{title}</h1>
+              <span className="shrink-0 text-sm text-neutral-400 opacity-0 transition-opacity group-hover:opacity-100">
+                ✎
+              </span>
+            </div>
           )}
         </div>
 
