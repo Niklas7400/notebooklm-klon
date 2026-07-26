@@ -5,7 +5,10 @@ import type { MatchChunkResult } from "@/lib/types";
 // Rausch-Treffer -- verwerfen, damit die Prompt-Regel "sag explizit, wenn es
 // nicht in den Quellen steht" tatsaechlich greifen kann.
 const SIMILARITY_THRESHOLD = 0.3;
-const DEFAULT_MATCH_COUNT = 6;
+// Am oberen Ende der in CLAUDE.md vorgegebenen Spanne (5-8), um die kleinere
+// Chunk-Groesse (siehe chunking.ts) auszugleichen -- mehr, kleinere Treffer
+// sollen in Summe eine aehnliche Kontextmenge wie vorher liefern.
+const DEFAULT_MATCH_COUNT = 8;
 
 export async function searchChunks(
   notebookId: string,

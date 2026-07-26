@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chunkText } from "./chunking";
+import { chunkText, CHUNK_SIZE } from "./chunking";
 
 describe("chunkText", () => {
   it("gibt kurzen Text als einzelnen Chunk zurueck", async () => {
@@ -13,7 +13,7 @@ describe("chunkText", () => {
 
     expect(chunks.length).toBeGreaterThan(1);
     for (const chunk of chunks) {
-      expect(chunk.length).toBeLessThanOrEqual(1800);
+      expect(chunk.length).toBeLessThanOrEqual(CHUNK_SIZE);
     }
   });
 
