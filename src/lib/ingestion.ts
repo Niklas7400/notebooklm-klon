@@ -65,7 +65,8 @@ export async function fetchUrlText(
 // Bewusst eine einfache Regex-basierte Extraktion statt einer zusaetzlichen
 // Abhaengigkeit wie jsdom/Readability -- fuer ein Demo-Projekt reicht reiner
 // Fliesstext, ein sauber aufbereiteter Lesemodus ist nicht das Ziel.
-function htmlToText(html: string): string {
+// Exportiert, damit die Extraktionslogik isoliert testbar ist.
+export function htmlToText(html: string): string {
   const withoutJunk = html
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
@@ -84,7 +85,7 @@ function htmlToText(html: string): string {
     .trim();
 }
 
-function decodeHtmlEntities(input: string): string {
+export function decodeHtmlEntities(input: string): string {
   return input
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")

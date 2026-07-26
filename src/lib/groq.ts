@@ -180,7 +180,8 @@ ${context}`;
   return parseAudioScript(raw);
 }
 
-function parseAudioScript(raw: string): AudioScriptLine[] {
+// Exportiert, damit die JSON-Parsing-/Validierungslogik isoliert testbar ist.
+export function parseAudioScript(raw: string): AudioScriptLine[] {
   const start = raw.indexOf("[");
   const end = raw.lastIndexOf("]");
   if (start === -1 || end === -1 || end < start) {

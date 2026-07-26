@@ -59,7 +59,7 @@ SITE_PASSWORD=                   # Middleware-Passwort-Gate, leer lassen = kein 
 npm test
 ```
 
-11 Unit-Tests für Chunker (`src/lib/chunking.ts`), Zitat-Parser (`src/lib/citations.ts`) und Leertext-Validierung (`src/lib/ingestion.ts`) — die drei Stellen, an denen sich Formatannahmen am leichtesten stillschweigend brechen lassen.
+37 Unit-Tests über 6 Dateien für die reine, von externen APIs unabhängige Logik: Chunker, Zitat-Parser, Leertext-Validierung, HTML-Extraktion für URL-Quellen, RAG-Prompt-/Zitat-Aufbau, relative Datumsanzeige und das Parsen der Audio-Overview-Skript-Antwort — die Stellen, an denen sich Formatannahmen am leichtesten stillschweigend brechen lassen. Funktionen mit echten API-Calls (Groq, Voyage, Google TTS, Supabase) sind bewusst nicht unit-getestet, sondern manuell gegen die echte Umgebung verifiziert (siehe Commit-Historie).
 
 ## Bewusste Scope-Entscheidungen
 
