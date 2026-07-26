@@ -22,6 +22,10 @@ export function NotebookWorkspace({
 }) {
   const router = useRouter();
   const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
+  const [viewingSource, setViewingSource] = useState<{
+    filename: string;
+    raw_text: string;
+  } | null>(null);
   const [excludedSourceIds, setExcludedSourceIds] = useState<Set<string>>(new Set());
   const [summary, setSummary] = useState(notebook.summary);
   const [summarizing, setSummarizing] = useState(false);
@@ -85,6 +89,13 @@ export function NotebookWorkspace({
         return next;
       });
       router.refresh();
+    }
+  }
+
+  async function handleViewSource(sourceId: string) {
+    const res = await fetch(`/api/sources/${sourceId}`);
+    if (res.ok) {
+      setViewingSource(await res.json());
     }
   }
 
@@ -212,9 +223,14 @@ export function NotebookWorkspace({
                     onChange={() => toggleSource(s.id)}
                     title="Diese Quelle in die Suche einbeziehen"
                   />
-                  <span className="min-w-0 flex-1 truncate" title={s.filename}>
+                  <button
+                    type="button"
+                    onClick={() => handleViewSource(s.id)}
+                    className="min-w-0 flex-1 truncate text-left hover:underline"
+                    title={`${s.filename} — Volltext anzeigen`}
+                  >
                     {s.filename}
-                  </span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => handleDeleteSource(s.id)}
@@ -238,6 +254,27 @@ export function NotebookWorkspace({
           initialClipUrls={notebook.audio_clip_urls}
           initialStatus={notebook.audio_status}
         />
+
+        {viewingSource && (
+          <div className="rounded border border-neutral-200 p-3 text-xs dark:border-neutral-800">
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <span className="truncate font-medium" title={viewingSource.filename}>
+                {viewingSource.filename}
+              </span>
+              <button
+                type="button"
+                onClick={() => setViewingSource(null)}
+                className="shrink-0 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+                aria-label="Schließen"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="max-h-64 overflow-y-auto whitespace-pre-wrap text-neutral-600 dark:text-neutral-400">
+              {viewingSource.raw_text}
+            </p>
+          </div>
+        )}
 
         {selectedCitation && (
           <div className="rounded border border-neutral-200 p-3 text-xs dark:border-neutral-800">
