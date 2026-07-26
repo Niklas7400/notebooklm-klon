@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { Citation, Message } from "@/lib/types";
 import { splitContentByCitations } from "@/lib/citations";
 
@@ -35,21 +35,32 @@ export function Chat({
   notebookId,
   initialMessages,
   sourceIds,
+  suggestedQuestions,
   onCitationClick,
 }: {
   notebookId: string;
   initialMessages: Message[];
   sourceIds: string[] | null;
+  suggestedQuestions?: string[];
   onCitationClick: (citation: Citation) => void;
 }) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const messageIdCounter = useRef(0);
 
-  async function handleSubmit(e: FormEvent) {
+  function nextMessageId(prefix: string) {
+    messageIdCounter.current += 1;
+    return `${prefix}-${messageIdCounter.current}`;
+  }
+
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    const question = input.trim();
+    submitQuestion(input.trim());
+  }
+
+  async function submitQuestion(question: string) {
     if (!question || pending) return;
 
     setInput("");
@@ -58,7 +69,7 @@ export function Chat({
     setMessages((prev) => [
       ...prev,
       {
-        id: `pending-user-${Date.now()}`,
+        id: nextMessageId("pending-user"),
         notebook_id: notebookId,
         role: "user",
         content: question,
@@ -85,7 +96,7 @@ export function Chat({
         ? JSON.parse(decodeURIComponent(citationsHeader))
         : [];
 
-      const assistantId = `assistant-${Date.now()}`;
+      const assistantId = nextMessageId("assistant");
       setMessages((prev) => [
         ...prev,
         {
@@ -125,9 +136,26 @@ export function Chat({
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="flex-1 overflow-y-auto p-6">
         {messages.length === 0 ? (
-          <p className="text-sm text-neutral-500">
-            Stelle eine Frage zu den hochgeladenen Quellen.
-          </p>
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-neutral-500">
+              Stelle eine Frage zu den hochgeladenen Quellen.
+            </p>
+            {suggestedQuestions && suggestedQuestions.length > 0 && (
+              <div className="flex flex-col items-start gap-2">
+                {suggestedQuestions.map((q, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => submitQuestion(q)}
+                    disabled={pending}
+                    className="rounded-md border border-neutral-300 px-3 py-1.5 text-left text-sm text-neutral-700 hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         ) : (
           <ul className="flex flex-col gap-4">
             {messages.map((m) => (

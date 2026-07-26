@@ -126,6 +126,23 @@ ${context}`;
   return groqChat(CHAT_MODEL, [{ role: "user", content: prompt }]);
 }
 
+// Vorgeschlagene Einstiegsfragen (optionales Feature): nach jedem Upload neu
+// generiert, damit sie zu den aktuell vorhandenen Quellen passen. Leichtes
+// Modell (wie beim Query-Rewriting) reicht fuer diese kurze Aufgabe.
+export async function generateSuggestedQuestions(context: string): Promise<string[]> {
+  const prompt = `Schlage genau 4 kurze Einstiegsfragen vor, die ein Nutzer zu den folgenden Quellen stellen koennte. Eine Frage pro Zeile, ohne Nummerierung, ohne Aufzaehlungszeichen, ohne Einleitung oder Erklaerung. Antworte in der Sprache der Quellen.
+
+Quellen:
+${context}`;
+
+  const raw = await groqChat(REWRITE_MODEL, [{ role: "user", content: prompt }]);
+  return raw
+    .split("\n")
+    .map((line) => line.replace(/^[\s\-*\d.)]+/, "").trim())
+    .filter((line) => line.length > 0)
+    .slice(0, 4);
+}
+
 // Study Guide (optionales Feature): Kernkonzepte + FAQ auf Knopfdruck, nicht
 // persistiert (im Gegensatz zum Notebook Guide) -- bei Bedarf neu generiert.
 // Genau zwei fest vorgegebene Abschnittsueberschriften statt eines "oder"

@@ -31,6 +31,7 @@ export function NotebookWorkspace({
   const [summarizing, setSummarizing] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(true);
   const [chatResetKey, setChatResetKey] = useState(0);
+  const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
   const [title, setTitle] = useState(notebook.title);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(notebook.title);
@@ -76,6 +77,17 @@ export function NotebookWorkspace({
       }
     } finally {
       setSummarizing(false);
+    }
+
+    // Vorgeschlagene Einstiegsfragen nach jedem Upload neu erzeugen, damit
+    // sie zu den aktuell vorhandenen Quellen passen (unabhaengig von der
+    // Zusammenfassung, kein Grund den Chat-Aufbau darauf warten zu lassen).
+    const questionsRes = await fetch(`/api/notebooks/${notebook.id}/suggested-questions`, {
+      method: "POST",
+    });
+    if (questionsRes.ok) {
+      const data = await questionsRes.json();
+      setSuggestedQuestions(data.questions);
     }
   }
 
@@ -330,6 +342,7 @@ export function NotebookWorkspace({
             notebookId={notebook.id}
             initialMessages={chatResetKey === 0 ? initialMessages : []}
             sourceIds={activeSourceIds}
+            suggestedQuestions={suggestedQuestions}
             onCitationClick={setSelectedCitation}
           />
         )}
