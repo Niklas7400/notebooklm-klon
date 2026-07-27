@@ -139,7 +139,11 @@ ${context}`;
   return raw
     .split("\n")
     .map((line) => line.replace(/^[\s\-*\d.)]+/, "").trim())
-    .filter((line) => line.length > 0)
+    // Llama haelt sich trotz "ohne Einleitung" gelegentlich nicht daran und
+    // stellt eine Ankuendigungszeile voran ("Hier sind vier Fragen: ...").
+    // Ein "?" am Ende ist ein zuverlaessiger Filter dafuer, dass die Zeile
+    // tatsaechlich eine Frage ist statt einer Einleitung/Erklaerung.
+    .filter((line) => line.endsWith("?"))
     .slice(0, 4);
 }
 
