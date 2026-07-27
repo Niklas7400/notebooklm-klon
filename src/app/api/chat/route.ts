@@ -1,8 +1,9 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { embedQuery } from "@/lib/voyage";
 import { searchChunks } from "@/lib/retrieval";
-import { rewriteQuery, streamAnswerQuestion, type ChatMessage } from "@/lib/groq";
+import { rewriteQuery, streamAnswerQuestion, generateFollowUpQuestions, type ChatMessage } from "@/lib/groq";
 import { buildSystemPrompt, buildCitations } from "@/lib/prompt";
+import { FOLLOWUP_MARKER } from "@/lib/followups";
 import type { Citation } from "@/lib/types";
 
 // Chat/RAG-Flow (siehe CLAUDE.md): Guard -> Verlauf laden -> ggf. Query-Rewriting
@@ -97,6 +98,20 @@ export async function POST(request: Request) {
         for await (const delta of streamAnswerQuestion(systemPrompt, history, question)) {
           fullAnswer += delta;
           controller.enqueue(encoder.encode(delta));
+        }
+
+        // Folgefragen brauchen den fertigen Antworttext als Kontext, koennen
+        // also erst nach Streamende generiert werden -- als letzter Chunk
+        // hinter dem Marker angehaengt (siehe lib/followups.ts). Scheitert
+        // dieser Zusatz-Call, wird die eigentliche Antwort davon nicht
+        // beeintraechtigt, es gibt dann einfach keine Folgefragen.
+        try {
+          const followUps = await generateFollowUpQuestions(question, fullAnswer);
+          if (followUps.length > 0) {
+            controller.enqueue(encoder.encode(FOLLOWUP_MARKER + JSON.stringify(followUps)));
+          }
+        } catch {
+          // Nice-to-have, kein Fehlerfall fuer den Nutzer.
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unbekannter Fehler beim Streaming.";

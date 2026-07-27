@@ -3,6 +3,7 @@
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { Citation, Message } from "@/lib/types";
 import { splitContentByCitations } from "@/lib/citations";
+import { parseFollowUpQuestions, stripFollowUpMarker } from "@/lib/followups";
 
 function renderContent(
   content: string,
@@ -52,6 +53,7 @@ export function Chat({
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
   const messageIdCounter = useRef(0);
 
   function nextMessageId(prefix: string) {
@@ -70,6 +72,7 @@ export function Chat({
     setInput("");
     setError(null);
     setPending(true);
+    setFollowUpQuestions([]);
     setMessages((prev) => [
       ...prev,
       {
@@ -118,17 +121,23 @@ export function Chat({
       // matcht dann einfach erst, sobald der Marker vollstaendig im Text steht).
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      let content = "";
+      let raw = "";
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        content += decoder.decode(value, { stream: true });
-        const currentContent = content;
+        raw += decoder.decode(value, { stream: true });
+        // Der Folgefragen-Marker (+ JSON) kommt erst als letzter Chunk nach
+        // Streamende an -- bis dahin einfach den Text davor anzeigen, das
+        // JSON wird erst nach done geparst (koennte sonst ueber mehrere
+        // Chunks fragmentiert sein).
+        const displayContent = stripFollowUpMarker(raw);
         setMessages((prev) =>
-          prev.map((m) => (m.id === assistantId ? { ...m, content: currentContent } : m))
+          prev.map((m) => (m.id === assistantId ? { ...m, content: displayContent } : m))
         );
       }
+
+      setFollowUpQuestions(parseFollowUpQuestions(raw));
     } catch {
       setError("Netzwerkfehler beim Senden der Frage.");
     } finally {
@@ -176,6 +185,21 @@ export function Chat({
               </li>
             ))}
           </ul>
+        )}
+
+        {messages.length > 0 && !pending && followUpQuestions.length > 0 && (
+          <div className="mt-3.5 flex max-w-3xl flex-col items-start gap-2">
+            {followUpQuestions.map((q, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => submitQuestion(q)}
+                className="btn btn-secondary text-left font-normal"
+              >
+                {q}
+              </button>
+            ))}
+          </div>
         )}
       </div>
 

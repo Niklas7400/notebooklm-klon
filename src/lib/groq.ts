@@ -147,6 +147,26 @@ ${context}`;
     .slice(0, 4);
 }
 
+// Folgefragen nach jeder Chat-Antwort (Nutzerwunsch, nicht in CLAUDE.md
+// vorgegeben): gleiches leichtes Modell wie beim Query-Rewriting, damit der
+// Zusatz-Call die eigentliche (gestreamte) Antwort nicht spuerbar verzoegert.
+export async function generateFollowUpQuestions(
+  question: string,
+  answer: string
+): Promise<string[]> {
+  const prompt = `Basierend auf diesem Frage-Antwort-Austausch: schlage genau 2-3 kurze, natuerliche Folgefragen vor, die der Nutzer als naechstes stellen koennte. Eine Frage pro Zeile, ohne Nummerierung, ohne Aufzaehlungszeichen, ohne Einleitung oder Erklaerung. Antworte in der Sprache des Austauschs.
+
+Frage: ${question}
+Antwort: ${answer}`;
+
+  const raw = await groqChat(REWRITE_MODEL, [{ role: "user", content: prompt }]);
+  return raw
+    .split("\n")
+    .map((line) => line.replace(/^[\s\-*\d.)]+/, "").trim())
+    .filter((line) => line.endsWith("?"))
+    .slice(0, 3);
+}
+
 // Study Guide (optionales Feature): Kernkonzepte + FAQ auf Knopfdruck, nicht
 // persistiert (im Gegensatz zum Notebook Guide) -- bei Bedarf neu generiert.
 // Genau zwei fest vorgegebene Abschnittsueberschriften statt eines "oder"

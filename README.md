@@ -7,7 +7,7 @@ Ein funktionierender Klon von [NotebookLM](https://notebooklm.google.com), gebau
 1. Notebooks anlegen und löschen
 2. Quellen hochladen: PDF, eingefügter Text, **URL** (Fetch + HTML-Text-Extraktion)
 3. Quellen werden automatisch in Chunks zerlegt, embedded und in einer Vektordatenbank durchsuchbar gemacht
-4. Chat mit **Streaming-Antworten**, die auf konkrete Quellstellen verweisen (klickbare Zitat-Nummern im Text zeigen den referenzierten Ausschnitt in der Sidebar)
+4. Chat mit **Streaming-Antworten**, die auf konkrete Quellstellen verweisen (klickbare Zitat-Nummern im Text zeigen den referenzierten Ausschnitt in der Sidebar); nach jeder Antwort werden 2–3 passende Folgefragen vorgeschlagen
 5. Bei jedem Upload wird automatisch eine aktuelle Zusammenfassung ("Notebook Guide") erzeugt und persistent gespeichert — einklappbar in der Sidebar
 6. Quellen-Auswahl per Checkbox (nur ausgewählte Quellen befragen)
 7. Chatverlauf bleibt nach einem Reload erhalten, Chat lässt sich zurücksetzen
@@ -59,7 +59,7 @@ SITE_PASSWORD=                   # Middleware-Passwort-Gate, leer lassen = kein 
 npm test
 ```
 
-37 Unit-Tests über 6 Dateien für die reine, von externen APIs unabhängige Logik: Chunker, Zitat-Parser, Leertext-Validierung, HTML-Extraktion für URL-Quellen, RAG-Prompt-/Zitat-Aufbau, relative Datumsanzeige und das Parsen der Audio-Overview-Skript-Antwort — die Stellen, an denen sich Formatannahmen am leichtesten stillschweigend brechen lassen. Funktionen mit echten API-Calls (Groq, Voyage, Google TTS, Supabase) sind bewusst nicht unit-getestet, sondern manuell gegen die echte Umgebung verifiziert (siehe Commit-Historie).
+44 Unit-Tests über 7 Dateien für die reine, von externen APIs unabhängige Logik: Chunker, Zitat-Parser, Leertext-Validierung, HTML-Extraktion für URL-Quellen, RAG-Prompt-/Zitat-Aufbau, relative Datumsanzeige, das Parsen der Audio-Overview-Skript-Antwort und das Abtrennen der Folgefragen vom Chat-Antwort-Stream — die Stellen, an denen sich Formatannahmen am leichtesten stillschweigend brechen lassen. Funktionen mit echten API-Calls (Groq, Voyage, Google TTS, Supabase) sind bewusst nicht unit-getestet, sondern manuell gegen die echte Umgebung verifiziert (siehe Commit-Historie).
 
 ## Bewusste Scope-Entscheidungen
 
