@@ -45,7 +45,9 @@ export function NotebookWorkspace({
   const [summarizing, setSummarizing] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(true);
   const [chatResetKey, setChatResetKey] = useState(0);
-  const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
+  const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>(
+    notebook.suggested_questions ?? []
+  );
   const [title, setTitle] = useState(notebook.title);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(notebook.title);

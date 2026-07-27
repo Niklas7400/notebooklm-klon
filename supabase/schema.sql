@@ -8,6 +8,7 @@ create table notebooks (
   id uuid primary key default gen_random_uuid(),
   title text not null,
   summary text, -- persistente Zusammenfassung, sonst nach Reload weg
+  suggested_questions jsonb, -- string[] vorgeschlagener Einstiegsfragen, sonst nach Reload/Notebook-Wechsel weg
   is_demo boolean not null default false, -- schuetzt das vorbefuellte Demo-Notebook vor Loeschen (Guard in der Delete-Route)
   audio_script jsonb, -- [{ speaker: 'A'|'B', text: '...' }, ...] -- Podcast-Skript
   audio_clip_urls jsonb, -- geordnetes Array von Supabase-Storage-URLs, ein Clip pro Skript-Zeile
