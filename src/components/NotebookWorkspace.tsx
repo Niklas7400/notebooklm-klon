@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { UploadForm } from "@/components/UploadForm";
 import { Chat } from "@/components/Chat";
-import { AudioOverview } from "@/components/AudioOverview";
-import { StudyGuide } from "@/components/StudyGuide";
+import { GenerateSidebar } from "@/components/GenerateSidebar";
 import { Dialog } from "@/components/Dialog";
 import type { Citation, Message, Notebook, Source } from "@/lib/types";
 
@@ -413,20 +412,6 @@ export function NotebookWorkspace({
               Quelle hinzufügen
             </button>
           </div>
-
-          <div className="hr" />
-
-          <StudyGuide notebookId={notebook.id} hasSources={sources.length > 0} />
-
-          <div className="hr" />
-
-          <AudioOverview
-            notebookId={notebook.id}
-            hasSources={sources.length > 0}
-            initialScript={notebook.audio_script}
-            initialClipUrls={notebook.audio_clip_urls}
-            initialStatus={notebook.audio_status}
-          />
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -449,6 +434,14 @@ export function NotebookWorkspace({
             />
           )}
         </main>
+
+        <GenerateSidebar
+          notebookId={notebook.id}
+          hasSources={sources.length > 0}
+          initialAudioScript={notebook.audio_script}
+          initialAudioClipUrls={notebook.audio_clip_urls}
+          initialAudioStatus={notebook.audio_status}
+        />
       </div>
 
       <Dialog open={uploadOpen} onClose={() => setUploadOpen(false)} title="Quelle hinzufügen">

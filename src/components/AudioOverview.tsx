@@ -98,9 +98,23 @@ export function AudioOverview({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <h6 className="m-0 text-[11px] tracking-[0.08em] text-neutral-400 uppercase">
-          Audio Overview
-        </h6>
+        <div className="flex items-center gap-2 text-neutral-300">
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M4 9a8 8 0 1 1 5.6 7.6" />
+            <path d="M4 9v5h5" />
+            <path d="M12 8v4l3 2" />
+          </svg>
+          <h6 className="m-0 text-[13px] tracking-[0.08em] uppercase">Audio Overview</h6>
+        </div>
         <button
           type="button"
           onClick={handleGenerate}
