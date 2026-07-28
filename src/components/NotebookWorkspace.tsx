@@ -268,7 +268,7 @@ export function NotebookWorkspace({
       </nav>
 
       <div className="flex flex-1 overflow-hidden">
-        <aside className="flex w-1/4 shrink-0 flex-col gap-[22px] overflow-y-auto p-5">
+        <aside className="flex w-1/4 shrink-0 flex-col gap-[22px] overflow-y-auto border-r border-divider p-5">
           <div>
             <button
               type="button"
