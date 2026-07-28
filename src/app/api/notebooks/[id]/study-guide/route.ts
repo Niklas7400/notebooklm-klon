@@ -2,8 +2,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { generateStudyGuide } from "@/lib/groq";
 
 // Optionales Feature (siehe CLAUDE.md "Optional"): Study Guide + FAQ auf
-// Knopfdruck. Anders als die automatische Zusammenfassung nicht persistiert --
-// wird bei jedem Klick frisch generiert, kein neues Schema-Feld noetig.
+// Knopfdruck. Wird bei jedem Klick frisch generiert und in
+// notebooks.study_guide ueberschrieben (wie die Zusammenfassung), sonst ist
+// er nach einem Reload bzw. erneutem Oeffnen des Notebooks weg.
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,8 @@ export async function POST(
     .join("\n\n");
 
   const studyGuide = await generateStudyGuide(context);
+
+  await supabase.from("notebooks").update({ study_guide: studyGuide }).eq("id", notebookId);
 
   return Response.json({ studyGuide });
 }

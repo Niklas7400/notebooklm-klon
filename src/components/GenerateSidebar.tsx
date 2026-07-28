@@ -52,12 +52,14 @@ function CollapsedIconButton({
 export function GenerateSidebar({
   notebookId,
   hasSources,
+  initialStudyGuide,
   initialAudioScript,
   initialAudioClipUrls,
   initialAudioStatus,
 }: {
   notebookId: string;
   hasSources: boolean;
+  initialStudyGuide: string | null;
   initialAudioScript: AudioScriptLine[] | null;
   initialAudioClipUrls: (string | null)[] | null;
   initialAudioStatus: AudioStatus;
@@ -67,7 +69,7 @@ export function GenerateSidebar({
   return (
     <aside
       className="flex shrink-0 flex-col overflow-y-auto overflow-x-hidden border-l border-divider transition-[width] duration-[180ms] ease-in-out"
-      style={{ width: open ? 320 : 56 }}
+      style={{ width: open ? "25%" : 56 }}
     >
       <div
         className={`flex shrink-0 items-center px-3.5 pt-4 pb-2 ${open ? "justify-between" : "justify-center"}`}
@@ -98,8 +100,12 @@ export function GenerateSidebar({
       </div>
 
       {open ? (
-        <div className="flex w-80 flex-col gap-[22px] px-5 pt-2 pb-5">
-          <StudyGuide notebookId={notebookId} hasSources={hasSources} />
+        <div className="flex w-full min-w-0 flex-col gap-[22px] px-5 pt-2 pb-5">
+          <StudyGuide
+            notebookId={notebookId}
+            hasSources={hasSources}
+            initialStudyGuide={initialStudyGuide}
+          />
 
           <div className="hr" />
 

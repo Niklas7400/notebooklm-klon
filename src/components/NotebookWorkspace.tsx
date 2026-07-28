@@ -268,7 +268,7 @@ export function NotebookWorkspace({
       </nav>
 
       <div className="flex flex-1 overflow-hidden">
-        <aside className="flex w-80 shrink-0 flex-col gap-[22px] overflow-y-auto p-5">
+        <aside className="flex w-1/4 shrink-0 flex-col gap-[22px] overflow-y-auto p-5">
           <div>
             <button
               type="button"
@@ -386,7 +386,7 @@ export function NotebookWorkspace({
                     ✕
                   </button>
                 </div>
-                <p className="m-0 max-h-40 overflow-y-auto text-xs leading-[1.6] whitespace-pre-wrap text-neutral-400">
+                <p className="m-0 max-h-[32rem] overflow-y-auto text-xs leading-[1.6] whitespace-pre-wrap text-neutral-400">
                   {viewingSource.raw_text}
                 </p>
               </div>
@@ -440,6 +440,7 @@ export function NotebookWorkspace({
         <GenerateSidebar
           notebookId={notebook.id}
           hasSources={sources.length > 0}
+          initialStudyGuide={notebook.study_guide}
           initialAudioScript={notebook.audio_script}
           initialAudioClipUrls={notebook.audio_clip_urls}
           initialAudioStatus={notebook.audio_status}

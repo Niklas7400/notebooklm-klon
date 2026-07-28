@@ -18,6 +18,7 @@ export type Notebook = {
   title: string;
   summary: string | null;
   suggested_questions: string[] | null;
+  study_guide: string | null;
   is_demo: boolean;
   audio_script: AudioScriptLine[] | null;
   // Ein einzelner Eintrag ist null, wenn der TTS-Call fuer diese Skript-Zeile

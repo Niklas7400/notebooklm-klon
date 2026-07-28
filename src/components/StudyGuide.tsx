@@ -39,12 +39,14 @@ function renderMarkdownLite(text: string): ReactNode[] {
 export function StudyGuide({
   notebookId,
   hasSources,
+  initialStudyGuide,
 }: {
   notebookId: string;
   hasSources: boolean;
+  initialStudyGuide: string | null;
 }) {
-  const [studyGuide, setStudyGuide] = useState<string | null>(null);
-  const [open, setOpen] = useState(false);
+  const [studyGuide, setStudyGuide] = useState<string | null>(initialStudyGuide);
+  const [open, setOpen] = useState(!!initialStudyGuide);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -109,7 +111,7 @@ export function StudyGuide({
             {open ? "Einklappen" : "Anzeigen"}
           </button>
           {open && (
-            <div className="max-h-56 overflow-y-auto rounded-md border border-divider p-2.5">
+            <div className="max-h-[32rem] overflow-y-auto rounded-md border border-divider p-2.5">
               {renderMarkdownLite(studyGuide)}
             </div>
           )}

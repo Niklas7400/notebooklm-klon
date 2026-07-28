@@ -33,6 +33,7 @@ export function AudioOverview({
   const [error, setError] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [sectionOpen, setSectionOpen] = useState(true);
   const audioRef = useRef<HTMLAudioElement>(null);
 
   async function handleGenerate() {
@@ -98,7 +99,25 @@ export function AudioOverview({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-neutral-300">
+        <button
+          type="button"
+          onClick={() => setSectionOpen((o) => !o)}
+          className="flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-neutral-300"
+          aria-expanded={sectionOpen}
+        >
+          <svg
+            width="11"
+            height="11"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={`shrink-0 transition-transform ${sectionOpen ? "rotate-90" : ""}`}
+          >
+            <path d="M9 18l6-6-6-6" />
+          </svg>
           <svg
             width="15"
             height="15"
@@ -114,7 +133,7 @@ export function AudioOverview({
             <path d="M12 8v4l3 2" />
           </svg>
           <h6 className="m-0 text-[13px] tracking-[0.08em] uppercase">Audio Overview</h6>
-        </div>
+        </button>
         <button
           type="button"
           onClick={handleGenerate}
@@ -129,56 +148,67 @@ export function AudioOverview({
         </button>
       </div>
 
-      {generating && (
-        <p className="m-0 text-xs text-accent-300">
-          <span className="inline-block animate-[pulse_1.4s_ease-in-out_infinite]">
-            Podcast-Gespräch wird erstellt…
-          </span>
-        </p>
-      )}
-      {!generating && error && <p className="m-0 text-xs text-danger">{error}</p>}
-      {!generating && !error && !hasSources && (
-        <p className="m-0 text-xs text-neutral-500">Erst eine Quelle hochladen.</p>
-      )}
-      {!generating && !error && hasSources && status === "none" && (
-        <p className="m-0 text-xs text-neutral-500">Noch kein Audio Overview generiert.</p>
-      )}
+      {/* Immer gemountet (nur visuell versteckt), damit ein Einklappen der
+          Sektion eine laufende Wiedergabe nicht unterbricht. */}
+      <audio ref={audioRef} onEnded={handleEnded} className="hidden" />
 
-      {script && clipUrls && status === "ready" && (
-        <div className="mt-2 flex flex-col gap-2">
-          <audio ref={audioRef} onEnded={handleEnded} className="hidden" />
-          <button type="button" onClick={handlePlayPause} className="btn btn-primary self-start">
-            {isPlaying ? (
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="6" y="5" width="4" height="14" />
-                <rect x="14" y="5" width="4" height="14" />
-              </svg>
-            ) : (
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            )}
-            {isPlaying ? "Pause" : "Abspielen"}
-          </button>
-          <div className="flex max-h-56 flex-col gap-1 overflow-y-auto">
-            {script.map((line, i) => (
-              <div
-                key={i}
-                className={`rounded-sm px-2 py-1.5 text-xs ${
-                  i === currentIndex ? "bg-accent-800" : "bg-transparent"
-                }`}
+      {sectionOpen && (
+        <>
+          {generating && (
+            <p className="m-0 text-xs text-accent-300">
+              <span className="inline-block animate-[pulse_1.4s_ease-in-out_infinite]">
+                Podcast-Gespräch wird erstellt…
+              </span>
+            </p>
+          )}
+          {!generating && error && <p className="m-0 text-xs text-danger">{error}</p>}
+          {!generating && !error && !hasSources && (
+            <p className="m-0 text-xs text-neutral-500">Erst eine Quelle hochladen.</p>
+          )}
+          {!generating && !error && hasSources && status === "none" && (
+            <p className="m-0 text-xs text-neutral-500">Noch kein Audio Overview generiert.</p>
+          )}
+
+          {script && clipUrls && status === "ready" && (
+            <div className="mt-2 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={handlePlayPause}
+                className="btn btn-primary self-start"
               >
-                <span className="font-medium text-accent-300">
-                  {line.speaker === "A" ? "Host A" : "Host B"}:{" "}
-                </span>
-                <span className="text-neutral-300">{line.text}</span>
-                {!clipUrls[i] && (
-                  <span className="ml-1 text-neutral-500">(Audio nicht verfügbar)</span>
+                {isPlaying ? (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="6" y="5" width="4" height="14" />
+                    <rect x="14" y="5" width="4" height="14" />
+                  </svg>
+                ) : (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
                 )}
+                {isPlaying ? "Pause" : "Abspielen"}
+              </button>
+              <div className="flex max-h-[32rem] flex-col gap-1 overflow-y-auto">
+                {script.map((line, i) => (
+                  <div
+                    key={i}
+                    className={`rounded-sm px-2 py-1.5 text-xs ${
+                      i === currentIndex ? "bg-accent-800" : "bg-transparent"
+                    }`}
+                  >
+                    <span className="font-medium text-accent-300">
+                      {line.speaker === "A" ? "Host A" : "Host B"}:{" "}
+                    </span>
+                    <span className="text-neutral-300">{line.text}</span>
+                    {!clipUrls[i] && (
+                      <span className="ml-1 text-neutral-500">(Audio nicht verfügbar)</span>
+                    )}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
