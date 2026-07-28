@@ -43,7 +43,7 @@ export function NotebookWorkspace({
   const [excludedSourceIds, setExcludedSourceIds] = useState<Set<string>>(new Set());
   const [summary, setSummary] = useState(notebook.summary);
   const [summarizing, setSummarizing] = useState(false);
-  const [summaryOpen, setSummaryOpen] = useState(true);
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [chatResetKey, setChatResetKey] = useState(0);
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>(
     notebook.suggested_questions ?? []

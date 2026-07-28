@@ -33,7 +33,7 @@ export function AudioOverview({
   const [error, setError] = useState<string | null>(null);
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [sectionOpen, setSectionOpen] = useState(true);
+  const [sectionOpen, setSectionOpen] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
 
   async function handleGenerate() {
@@ -41,6 +41,7 @@ export function AudioOverview({
     setError(null);
     setIsPlaying(false);
     setCurrentIndex(-1);
+    setSectionOpen(true);
     try {
       const res = await fetch(`/api/notebooks/${notebookId}/audio`, { method: "POST" });
       const body = await res.json().catch(() => null);

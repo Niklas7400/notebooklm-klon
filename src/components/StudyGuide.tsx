@@ -46,7 +46,7 @@ export function StudyGuide({
   initialStudyGuide: string | null;
 }) {
   const [studyGuide, setStudyGuide] = useState<string | null>(initialStudyGuide);
-  const [open, setOpen] = useState(!!initialStudyGuide);
+  const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
