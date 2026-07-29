@@ -365,6 +365,16 @@ function findMatchingBrace(raw: string, start: number): number {
 // erwarten, wird hier jedes klammer-balancierte "{...}"-Objekt im Rohtext
 // einzeln per echtem JSON.parse gepruft -- robust gegenueber vertauschter
 // Feld-Reihenfolge und zusaetzlichen Feldern, die das Modell einstreut.
+function isScriptLine(value: unknown): value is AudioScriptLine {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    (candidate.speaker === "A" || candidate.speaker === "B") &&
+    typeof candidate.text === "string" &&
+    candidate.text.trim().length > 0
+  );
+}
+
 function extractScriptObjects(raw: string): unknown[] | null {
   const objects: unknown[] = [];
   let i = raw.indexOf("{");
@@ -381,8 +391,17 @@ function extractScriptObjects(raw: string): unknown[] | null {
     }
     try {
       const value = JSON.parse(raw.slice(i, end + 1));
-      objects.push(value);
-      i = raw.indexOf("{", end + 1);
+      if (isScriptLine(value)) {
+        objects.push(value);
+        i = raw.indexOf("{", end + 1);
+      } else {
+        // Valides JSON, aber selbst keine Gespraechs-Zeile -- typischerweise
+        // ein Wrapper-Objekt wie {"script": [...]} oder {"titel": "...",
+        // "script": [...]}. Nicht komplett ueberspringen (end + 1), sondern
+        // ab i + 1 weitersuchen, damit die darin verschachtelten
+        // Gespraechs-Zeilen trotzdem gefunden werden.
+        i = raw.indexOf("{", i + 1);
+      }
     } catch {
       // Kein valides JSON-Objekt an dieser Stelle -- oft eine Wrapper-
       // Klammer mit z.B. einem Trailing-Komma im inneren Array. Ab der
@@ -401,15 +420,7 @@ export function parseAudioScript(raw: string): AudioScriptLine[] {
     throw new Error("Skript-Antwort enthielt kein JSON-Array.");
   }
 
-  const lines = parsed.filter((item): item is AudioScriptLine => {
-    if (!item || typeof item !== "object") return false;
-    const candidate = item as Record<string, unknown>;
-    return (
-      (candidate.speaker === "A" || candidate.speaker === "B") &&
-      typeof candidate.text === "string" &&
-      candidate.text.trim().length > 0
-    );
-  });
+  const lines = parsed.filter(isScriptLine);
 
   if (lines.length === 0) {
     throw new Error("Skript enthielt keine gültigen Gesprächs-Zeilen.");

@@ -140,6 +140,25 @@ describe("parseAudioScript", () => {
     ]);
   });
 
+  it("schaut in ein gueltig geparstes Wrapper-Objekt hinein, statt es als Ganzes zu verwerfen (Wrapper-Klammer enthaelt selbst kein 'speaker'/'text')", () => {
+    // Ein "[" im Wrapper-Feld "titel" liegt vor dem eigentlichen
+    // Script-Array -- die einfache Klammer-Slice-Strategie (erstes "[" bis
+    // letztes "]") wuerde hier ueber die Objektgrenze hinaus falsch schneiden.
+    const raw =
+      '{"titel":"Podcast [Folge 1]","script":[{"speaker":"A","text":"Hallo"},{"speaker":"B","text":"Hi"}]}';
+    expect(parseAudioScript(raw)).toEqual([
+      { speaker: "A", text: "Hallo" },
+      { speaker: "B", text: "Hi" },
+    ]);
+  });
+
+  it("schaut in ein gueltig geparstes Wrapper-Objekt hinein, wenn nach dem Script-Array noch ein weiteres Array-Feld folgt", () => {
+    // "tags" nach "script" verschiebt das lastIndexOf("]") auf das falsche
+    // Array-Ende.
+    const raw = '{"script":[{"speaker":"A","text":"Hallo"}],"tags":["intro"]}';
+    expect(parseAudioScript(raw)).toEqual([{ speaker: "A", text: "Hallo" }]);
+  });
+
   it("wirft einen Fehler, wenn kein JSON-Array enthalten ist", () => {
     expect(() => parseAudioScript("Das ist kein JSON.")).toThrow(
       "Skript-Antwort enthielt kein JSON-Array."
