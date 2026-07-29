@@ -72,7 +72,25 @@ export function StudyGuide({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-neutral-300">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-neutral-300"
+          aria-expanded={open}
+        >
+          <svg
+            width="11"
+            height="11"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={`shrink-0 transition-transform ${open ? "rotate-90" : ""}`}
+          >
+            <path d="M9 18l6-6-6-6" />
+          </svg>
           <svg
             width="15"
             height="15"
@@ -87,7 +105,7 @@ export function StudyGuide({
             <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
           </svg>
           <h6 className="m-0 text-[13px] tracking-[0.08em] uppercase">Study Guide &amp; FAQ</h6>
-        </div>
+        </button>
         <button
           type="button"
           onClick={handleGenerate}
@@ -98,19 +116,13 @@ export function StudyGuide({
         </button>
       </div>
 
-      {!hasSources && <p className="m-0 text-xs text-neutral-500">Erst eine Quelle hochladen.</p>}
-      {error && <p className="m-0 text-xs text-danger">{error}</p>}
-
-      {studyGuide && (
+      {open && (
         <>
-          <button
-            type="button"
-            onClick={() => setOpen((o) => !o)}
-            className="mb-1 cursor-pointer border-0 bg-transparent p-0 text-[11px] text-neutral-500 hover:text-neutral-300"
-          >
-            {open ? "Einklappen" : "Anzeigen"}
-          </button>
-          {open && (
+          {!hasSources && (
+            <p className="m-0 text-xs text-neutral-500">Erst eine Quelle hochladen.</p>
+          )}
+          {error && <p className="m-0 text-xs text-danger">{error}</p>}
+          {studyGuide && (
             <div className="max-h-[32rem] overflow-y-auto rounded-md border border-divider p-2.5">
               {renderMarkdownLite(studyGuide)}
             </div>

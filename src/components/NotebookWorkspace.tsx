@@ -270,43 +270,6 @@ export function NotebookWorkspace({
       <div className="flex flex-1 overflow-hidden">
         <aside className="flex w-1/4 shrink-0 flex-col gap-[22px] overflow-y-auto border-r border-divider p-5">
           <div>
-            <button
-              type="button"
-              onClick={() => setSummaryOpen((open) => !open)}
-              className="flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 font-heading text-[11px] tracking-[0.08em] text-neutral-400 uppercase"
-              aria-expanded={summaryOpen}
-            >
-              <svg
-                width="11"
-                height="11"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className={`transition-transform ${summaryOpen ? "rotate-90" : ""}`}
-              >
-                <path d="M9 18l6-6-6-6" />
-              </svg>
-              Zusammenfassung
-            </button>
-            {summarizing && (
-              <p className="mt-1 mb-0 text-[10px] text-neutral-500">wird aktualisiert…</p>
-            )}
-            {summaryOpen &&
-              (summary ? (
-                <p className="mt-2.5 mb-0 text-[13px] leading-[1.6] text-neutral-300">{summary}</p>
-              ) : (
-                <p className="mt-2.5 mb-0 text-xs text-neutral-500">
-                  {summarizing ? "Wird erstellt…" : "Noch keine Zusammenfassung."}
-                </p>
-              ))}
-          </div>
-
-          <div className="hr" />
-
-          <div>
             <h6 className="m-0 mb-2.5 text-neutral-400">Quellen · {sources.length}</h6>
             {sources.length === 0 ? (
               <p className="m-0 text-xs text-neutral-500">Noch keine Quelle hochgeladen.</p>
@@ -440,6 +403,10 @@ export function NotebookWorkspace({
         <GenerateSidebar
           notebookId={notebook.id}
           hasSources={sources.length > 0}
+          summary={summary}
+          summarizing={summarizing}
+          summaryOpen={summaryOpen}
+          onToggleSummary={() => setSummaryOpen((open) => !open)}
           initialStudyGuide={notebook.study_guide}
           initialAudioScript={notebook.audio_script}
           initialAudioClipUrls={notebook.audio_clip_urls}

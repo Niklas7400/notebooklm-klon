@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { Summary } from "@/components/Summary";
 import { StudyGuide } from "@/components/StudyGuide";
 import { AudioOverview } from "@/components/AudioOverview";
 import type { AudioScriptLine, AudioStatus } from "@/lib/types";
 
+const SUMMARY_ICON_PATHS = ["M4 6h16", "M4 12h16", "M4 18h10"];
 const STUDY_GUIDE_ICON_PATHS = [
   "M4 19.5A2.5 2.5 0 0 1 6.5 17H20",
   "M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z",
@@ -52,6 +54,10 @@ function CollapsedIconButton({
 export function GenerateSidebar({
   notebookId,
   hasSources,
+  summary,
+  summarizing,
+  summaryOpen,
+  onToggleSummary,
   initialStudyGuide,
   initialAudioScript,
   initialAudioClipUrls,
@@ -59,6 +65,10 @@ export function GenerateSidebar({
 }: {
   notebookId: string;
   hasSources: boolean;
+  summary: string | null;
+  summarizing: boolean;
+  summaryOpen: boolean;
+  onToggleSummary: () => void;
   initialStudyGuide: string | null;
   initialAudioScript: AudioScriptLine[] | null;
   initialAudioClipUrls: (string | null)[] | null;
@@ -101,6 +111,15 @@ export function GenerateSidebar({
 
       {open ? (
         <div className="flex w-full min-w-0 flex-col gap-[22px] px-5 pt-2 pb-5">
+          <Summary
+            summary={summary}
+            summarizing={summarizing}
+            open={summaryOpen}
+            onToggle={onToggleSummary}
+          />
+
+          <div className="hr" />
+
           <StudyGuide
             notebookId={notebookId}
             hasSources={hasSources}
@@ -119,6 +138,11 @@ export function GenerateSidebar({
         </div>
       ) : (
         <div className="flex w-14 flex-col items-center gap-3 pt-0.5">
+          <CollapsedIconButton
+            paths={SUMMARY_ICON_PATHS}
+            label="Zusammenfassung"
+            onClick={() => setOpen(true)}
+          />
           <CollapsedIconButton
             paths={STUDY_GUIDE_ICON_PATHS}
             label="Study Guide & FAQ"
