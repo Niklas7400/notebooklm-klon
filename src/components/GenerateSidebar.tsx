@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Summary } from "@/components/Summary";
 import { StudyGuide } from "@/components/StudyGuide";
+import { MindMap } from "@/components/MindMap";
 import { AudioOverview } from "@/components/AudioOverview";
 import type { AudioScriptLine, AudioStatus } from "@/lib/types";
 
@@ -10,6 +11,13 @@ const SUMMARY_ICON_PATHS = ["M4 6h16", "M4 12h16", "M4 18h10"];
 const STUDY_GUIDE_ICON_PATHS = [
   "M4 19.5A2.5 2.5 0 0 1 6.5 17H20",
   "M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z",
+];
+const MIND_MAP_ICON_PATHS = [
+  "M3 12a2 2 0 1 0 4 0 2 2 0 0 0-4 0",
+  "M17 5a2 2 0 1 0 4 0 2 2 0 0 0-4 0",
+  "M17 12a2 2 0 1 0 4 0 2 2 0 0 0-4 0",
+  "M17 19a2 2 0 1 0 4 0 2 2 0 0 0-4 0",
+  "M7 12h5M12 12L17 5M12 12L17 12M12 12L17 19",
 ];
 const AUDIO_OVERVIEW_ICON_PATHS = ["M4 9a8 8 0 1 1 5.6 7.6", "M4 9v5h5", "M12 8v4l3 2"];
 
@@ -59,6 +67,7 @@ export function GenerateSidebar({
   summaryOpen,
   onToggleSummary,
   initialStudyGuide,
+  initialMindMap,
   initialAudioScript,
   initialAudioClipUrls,
   initialAudioStatus,
@@ -70,6 +79,7 @@ export function GenerateSidebar({
   summaryOpen: boolean;
   onToggleSummary: () => void;
   initialStudyGuide: string | null;
+  initialMindMap: string | null;
   initialAudioScript: AudioScriptLine[] | null;
   initialAudioClipUrls: (string | null)[] | null;
   initialAudioStatus: AudioStatus;
@@ -128,6 +138,14 @@ export function GenerateSidebar({
 
           <div className="hr" />
 
+          <MindMap
+            notebookId={notebookId}
+            hasSources={hasSources}
+            initialMindMap={initialMindMap}
+          />
+
+          <div className="hr" />
+
           <AudioOverview
             notebookId={notebookId}
             hasSources={hasSources}
@@ -146,6 +164,11 @@ export function GenerateSidebar({
           <CollapsedIconButton
             paths={STUDY_GUIDE_ICON_PATHS}
             label="Study Guide & FAQ"
+            onClick={() => setOpen(true)}
+          />
+          <CollapsedIconButton
+            paths={MIND_MAP_ICON_PATHS}
+            label="Mind Map"
             onClick={() => setOpen(true)}
           />
           <CollapsedIconButton

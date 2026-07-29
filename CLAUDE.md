@@ -54,9 +54,11 @@ Eine Web-App, mit der man:
 Optional, falls doch noch Zeit übrig ist (spontan am Ende entscheiden, z. B. nach Tag 8): Mehrere Notebooks parallel verwalten, Study-Guide- / FAQ-Generator als Button, Notebook umbenennen, Klick auf Quelle zeigt Volltext/Zusammenfassung der Quelle, vorgeschlagene Einstiegsfragen nach Upload.
 
 ### Explizit NICHT umsetzen (bewusste Scope-Entscheidung)
-- Mind Map / Video Overview / Sharing / "Discover Sources" — weitere NotebookLM-Features, die für den Zeitrahmen bewusst außen vor bleiben
+- Video Overview / Sharing / "Discover Sources" — weitere NotebookLM-Features, die für den Zeitrahmen bewusst außen vor bleiben
 - Pixelgenaues Highlighting im PDF-Viewer — reicht, wenn der referenzierte Textausschnitt angezeigt wird
 - Multi-User-Auth/Rechteverwaltung — Deployment ist einzelner (passwortgeschützter) Demo-Zugang, keine Nutzerverwaltung nötig
+
+> **Mind Map (nachträglich doch umgesetzt):** stand hier ursprünglich ebenfalls unter "bewusst ausgelassen", wurde aber nachträglich ergänzt. Groq generiert eine verschachtelte Markdown-Gliederung (gleiches robustes Format wie beim Study Guide, kein strenges JSON-Format-Risiko), [Markmap](https://markmap.js.org/) (`markmap-lib` + `markmap-view`) rendert daraus clientseitig eine interaktive, zoom-/pannbare Mind Map -- die Baum-Layout-Arbeit übernimmt die Bibliothek. Persistiert in `notebooks.mind_map`, on-demand generierbar wie Study Guide/Audio Overview, in der "Generieren"-Sidebar mit Vorschau + Vollbild-Dialog (die 25%-Sidebar ist für eine breit gefächerte Mind Map zu schmal, daher der Dialog für die eigentliche Ansicht).
 
 > Diese Liste gehört so auch ins README — bei "Umfang frei wählbar" ist die Begründung der Auslassungen genauso Teil der Bewertung wie die Features selbst.
 

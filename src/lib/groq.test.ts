@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseAudioScript } from "./groq";
+import { parseAudioScript, stripMarkdownCodeFence } from "./groq";
 
 describe("parseAudioScript", () => {
   it("parst ein sauberes JSON-Array", () => {
@@ -39,5 +39,26 @@ describe("parseAudioScript", () => {
     expect(() => parseAudioScript(raw)).toThrow(
       "Skript enthielt keine gültigen Gesprächs-Zeilen."
     );
+  });
+});
+
+describe("stripMarkdownCodeFence", () => {
+  it("gibt unveraendertes Markdown zurueck, wenn kein Codeblock vorhanden ist", () => {
+    const raw = "# Titel\n## Ast\n- Punkt";
+    expect(stripMarkdownCodeFence(raw)).toBe(raw);
+  });
+
+  it("entfernt einen ```markdown-Codeblock-Wrapper", () => {
+    const raw = "```markdown\n# Titel\n## Ast\n- Punkt\n```";
+    expect(stripMarkdownCodeFence(raw)).toBe("# Titel\n## Ast\n- Punkt");
+  });
+
+  it("entfernt einen Codeblock-Wrapper ohne Sprachangabe", () => {
+    const raw = "```\n# Titel\n- Punkt\n```";
+    expect(stripMarkdownCodeFence(raw)).toBe("# Titel\n- Punkt");
+  });
+
+  it("trimmt umgebende Leerzeichen/Zeilenumbrueche", () => {
+    expect(stripMarkdownCodeFence("  \n# Titel\n  \n")).toBe("# Titel");
   });
 });

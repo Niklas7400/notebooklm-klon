@@ -188,6 +188,46 @@ ${context}`;
   return groqChat(CHAT_MODEL, [{ role: "user", content: prompt }]);
 }
 
+// Entfernt einen ```-Codeblock-Wrapper, falls Llama die Markdown-Antwort
+// trotz Anweisung doch einmal darin einpackt (gleiche Grundtoleranz wie beim
+// Audio-Skript-Parsing weiter unten).
+export function stripMarkdownCodeFence(text: string): string {
+  const trimmed = text.trim();
+  const fenceMatch = trimmed.match(/^```[a-zA-Z]*\n([\s\S]*?)\n```$/);
+  return fenceMatch ? fenceMatch[1].trim() : trimmed;
+}
+
+// Mind Map (optionales Feature, urspruenglich bewusst ausgelassen, siehe
+// CLAUDE.md): verschachtelte Markdown-Gliederung statt strengem JSON, weil
+// Llama dieses Format schon beim Study Guide zuverlaessig liefert. Das
+// Frontend rendert die Gliederung per Markmap zu einer interaktiven Mind Map
+// -- die Baum-Layout-Arbeit uebernimmt die Bibliothek, nicht der Prompt.
+export async function generateMindMap(context: string): Promise<string> {
+  const prompt = `Erstelle eine Mind Map als verschachtelte Markdown-Gliederung zu den folgenden Quellen.
+
+Format (Beispiel, nur zur Veranschaulichung des Formats):
+# Zentrales Thema
+## Erster Hauptast
+- Unterpunkt
+- Unterpunkt
+  - Detailpunkt
+## Zweiter Hauptast
+- Unterpunkt
+
+Regeln:
+- Genau eine Wurzel-Überschrift (#) mit einem kurzen, prägnanten Titel für das gesamte Notebook.
+- 3–6 Hauptäste als Überschriften zweiter Ebene (##).
+- Pro Hauptast 2–4 Unterpunkte als Bullet-Liste, kurze Stichpunkte statt ganzer Sätze.
+- Nur die Gliederung selbst, keine Einleitung, keine Erklärung, keine Code-Blocks.
+- Antworte in der Sprache der Quellen.
+
+Quellen:
+${context}`;
+
+  const raw = await groqChat(CHAT_MODEL, [{ role: "user", content: prompt }]);
+  return stripMarkdownCodeFence(raw);
+}
+
 // Audio Overview (Tag 8): lockeres Zwei-Personen-Podcast-Skript als JSON.
 // Auf Anfrage generiert, nicht bei jedem Upload (siehe CLAUDE.md) -- TTS hat
 // im Gegensatz zu Groq ein begrenztes Freikontingent.

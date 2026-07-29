@@ -408,6 +408,7 @@ export function NotebookWorkspace({
           summaryOpen={summaryOpen}
           onToggleSummary={() => setSummaryOpen((open) => !open)}
           initialStudyGuide={notebook.study_guide}
+          initialMindMap={notebook.mind_map}
           initialAudioScript={notebook.audio_script}
           initialAudioClipUrls={notebook.audio_clip_urls}
           initialAudioStatus={notebook.audio_status}

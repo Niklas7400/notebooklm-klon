@@ -13,6 +13,7 @@ Ein funktionierender Klon von [NotebookLM](https://notebooklm.google.com), gebau
 7. Chatverlauf bleibt nach einem Reload erhalten, Chat lässt sich zurücksetzen
 8. Ein vorbefülltes Demo-Notebook ist beim Öffnen des Live-Links sofort verfügbar
 9. **Audio Overview**: auf Knopfdruck ein Zwei-Stimmen-Podcast-Gespräch über die Notebook-Inhalte generieren (Groq für das Skript, Google Cloud TTS für die Sprachausgabe, sequenzielle Wiedergabe im Player)
+10. **Mind Map**: auf Knopfdruck eine interaktive, zoom-/pannbare Mind Map der Notebook-Inhalte generieren (Groq für die Markdown-Gliederung, [Markmap](https://markmap.js.org/) fürs Rendering im Browser), mit Vorschau in der Sidebar und Vollbild-Ansicht
 
 ## Architektur
 
@@ -31,6 +32,7 @@ Next.js (App Router) als Frontend und API-Layer in einem, Supabase/Postgres mit 
 | Vektor-Speicher | Supabase (Postgres + `pgvector`) | REST-basierter JS-Client statt direkter Postgres-Connection (Connection-Limits in Serverless Functions) |
 | Chat-LLM | Groq, `llama-3.3-70b-versatile` (Chat/Zusammenfassung), `llama-3.1-8b-instant` (Query-Rewriting) | Echter Free-Tier ohne Kreditkarte, keine EU-Einschränkung |
 | Text-to-Speech | Google Cloud TTS (WaveNet), Stimmen `de-DE-Wavenet-F` / `de-DE-Wavenet-B` | ~1 Mio. Freizeichen/Monat, zwei unterschiedliche Stimmen für die zwei Podcast-Hosts |
+| Mind-Map-Rendering | [Markmap](https://markmap.js.org/) (`markmap-lib` + `markmap-view`) | Nimmt dem LLM die Baum-Layout-Arbeit ab; erwartet als Eingabe eine simple verschachtelte Markdown-Gliederung statt strengem JSON — robusteres LLM-Ausgabeformat |
 | Deployment | Vercel | Auto-Deploy bei Push auf `main` |
 
 ## Setup
@@ -61,7 +63,7 @@ SITE_PASSWORD=                   # Middleware-Passwort-Gate, leer lassen = kein 
 npm test
 ```
 
-44 Unit-Tests über 7 Dateien für die reine, von externen APIs unabhängige Logik: Chunker, Zitat-Parser, Leertext-Validierung, HTML-Extraktion für URL-Quellen, RAG-Prompt-/Zitat-Aufbau, relative Datumsanzeige, das Parsen der Audio-Overview-Skript-Antwort und das Abtrennen der Folgefragen vom Chat-Antwort-Stream — die Stellen, an denen sich Formatannahmen am leichtesten stillschweigend brechen lassen. Funktionen mit echten API-Calls (Groq, Voyage, Google TTS, Supabase) sind bewusst nicht unit-getestet, sondern manuell gegen die echte Umgebung verifiziert (siehe Commit-Historie).
+48 Unit-Tests über 7 Dateien für die reine, von externen APIs unabhängige Logik: Chunker, Zitat-Parser, Leertext-Validierung, HTML-Extraktion für URL-Quellen, RAG-Prompt-/Zitat-Aufbau, relative Datumsanzeige, das Parsen der Audio-Overview-Skript-Antwort, das Entfernen von Codeblock-Wrappern aus der Mind-Map-Markdown-Antwort und das Abtrennen der Folgefragen vom Chat-Antwort-Stream — die Stellen, an denen sich Formatannahmen am leichtesten stillschweigend brechen lassen. Funktionen mit echten API-Calls (Groq, Voyage, Google TTS, Supabase) sind bewusst nicht unit-getestet, sondern manuell gegen die echte Umgebung verifiziert (siehe Commit-Historie).
 
 ## Bewusste Scope-Entscheidungen
 
@@ -71,10 +73,11 @@ Der Umfang war frei wählbar. Umgesetzt wurden, in dieser Priorität:
 - **Streaming-Chat-Antworten** — vor Audio Overview, weil es die im MVP schon vorhandene Antwortqualität spürbar verbessert (kein Warten auf den kompletten Text), bevor ein komplett neues Feature dazukommt
 - **Quellen-Auswahl per Checkbox, URL-Quelle, vorbefülltes Demo-Notebook, Passwortschutz** — hoher Wirkungsgrad bei geringem Aufwand: ein Reviewer hat typischerweise nur wenige Minuten Zeit, das vorbefüllte Demo-Notebook dürfte davon den größten Unterschied machen
 - **Audio Overview** (Zwei-Stimmen-Podcast) bewusst vor die ursprünglich geplanten "Nice-to-have"-Punkte 1 und 3 gezogen, weil Everlast Voice Agents als eines ihrer Aushängeschilder führt — dieses Feature auszulassen wäre strategisch ungeschickt gewesen. On-demand per Button, nicht automatisch bei jedem Upload, weil TTS im Gegensatz zu Groq ein begrenztes Freikontingent hat.
+- **Reranking und Mind Map** wurden ursprünglich bewusst ausgelassen (siehe unten), nachträglich aber doch ergänzt — Reranking wegen der Skalierbarkeit bei großen Notebooks, Mind Map als weiterer, mit Markmap technisch günstig umsetzbarer Baustein der RAG-Inhaltsaufbereitung.
 
 **Explizit nicht umgesetzt** (bewusste Entscheidung, kein Zeitmangel-Zufall):
 
-- Mind Map / Video Overview / Sharing / "Discover Sources" — weitere NotebookLM-Features außerhalb des gesetzten Rahmens
+- Video Overview / Sharing / "Discover Sources" — weitere NotebookLM-Features außerhalb des gesetzten Rahmens
 - Pixelgenaues Highlighting im PDF-Viewer — der referenzierte Textausschnitt in der Sidebar reicht als Beleg
 - Multi-User-Auth/Rechteverwaltung — Deployment ist ein einzelner passwortgeschützter Demo-Zugang, keine Nutzerverwaltung nötig
 
