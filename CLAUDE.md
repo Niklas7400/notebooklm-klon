@@ -55,7 +55,7 @@ Optional, falls doch noch Zeit übrig ist (spontan am Ende entscheiden, z. B. na
 
 ### Explizit NICHT umsetzen (bewusste Scope-Entscheidung)
 - Video Overview / Sharing / "Discover Sources" — weitere NotebookLM-Features, die für den Zeitrahmen bewusst außen vor bleiben
-- Pixelgenaues Highlighting im PDF-Viewer — reicht, wenn der referenzierte Textausschnitt angezeigt wird
+- Pixelgenaues Highlighting **im gerenderten PDF** (Koordinaten-Overlay auf der Original-Seite) — es gibt bewusst keinen PDF-Renderer, nur die extrahierte Volltext-Ansicht. **Nachträglich ergänzt:** Die zitierte Stelle selbst wird trotzdem hervorgehoben — ein Klick auf einen Zitat-Verweis klappt die Quelle links auf und markiert die exakte Textstelle in der Volltext-Ansicht farblich (Scroll-in-View), siehe MVP-Punkt zu Zitaten oben
 - Multi-User-Auth/Rechteverwaltung — Deployment ist einzelner (passwortgeschützter) Demo-Zugang, keine Nutzerverwaltung nötig
 
 > **Mind Map (nachträglich doch umgesetzt):** stand hier ursprünglich ebenfalls unter "bewusst ausgelassen", wurde aber nachträglich ergänzt. Groq generiert eine verschachtelte Markdown-Gliederung (gleiches robustes Format wie beim Study Guide, kein strenges JSON-Format-Risiko), [Markmap](https://markmap.js.org/) (`markmap-lib` + `markmap-view`) rendert daraus clientseitig eine interaktive, zoom-/pannbare Mind Map -- die Baum-Layout-Arbeit übernimmt die Bibliothek. Persistiert in `notebooks.mind_map`, on-demand generierbar wie Study Guide/Audio Overview, in der "Generieren"-Sidebar mit Vorschau + Vollbild-Dialog (die 25%-Sidebar ist für eine breit gefächerte Mind Map zu schmal, daher der Dialog für die eigentliche Ansicht).

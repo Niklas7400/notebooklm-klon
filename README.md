@@ -87,7 +87,7 @@ Der Umfang war frei wählbar. Umgesetzt wurden, in dieser Priorität:
 **Explizit nicht umgesetzt** (bewusste Entscheidung, kein Zeitmangel-Zufall):
 
 - Video Overview / Sharing / "Discover Sources" — weitere NotebookLM-Features außerhalb des gesetzten Rahmens
-- Pixelgenaues Highlighting im PDF-Viewer — der referenzierte Textausschnitt in der Sidebar reicht als Beleg
+- Pixelgenaues Highlighting **im gerenderten PDF** (Koordinaten-Overlay auf der Original-Seite, wie es ein echter PDF-Viewer bräuchte) — es gibt bewusst keinen PDF-Renderer, nur die extrahierte Volltext-Ansicht. Die zitierte Stelle selbst *wird* hervorgehoben: ein Klick auf einen Zitat-Verweis klappt die Quelle links auf und markiert die exakte Textstelle dort farblich (siehe Feature-Liste oben)
 - Multi-User-Auth/Rechteverwaltung — Deployment ist ein einzelner passwortgeschützter Demo-Zugang, keine Nutzerverwaltung nötig
 
 ## Status
