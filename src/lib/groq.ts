@@ -310,52 +310,83 @@ ${context}`;
   return { script: parseAudioScript(text), usedFallbackModel };
 }
 
-function tryParseJsonArray(candidate: string): unknown[] | null {
+function tryParseJsonArrayFromBrackets(raw: string): unknown[] | null {
+  const start = raw.indexOf("[");
+  const end = raw.lastIndexOf("]");
+  if (start === -1 || end === -1 || end < start) return null;
   try {
-    const value = JSON.parse(candidate);
+    const value = JSON.parse(raw.slice(start, end + 1));
     return Array.isArray(value) ? value : null;
   } catch {
     return null;
   }
 }
 
+// Findet zu einer oeffnenden "{" an position `start` die zugehoerige
+// schliessende "}" unter Beruecksichtigung von String-Literalen (Klammern
+// innerhalb von Anführungszeichen zaehlen nicht mit, Escape-Sequenzen wie
+// \" werden uebersprungen). Gibt -1 zurueck, wenn keine passende Klammer
+// gefunden wird (abgeschnittene Antwort).
+function findMatchingBrace(raw: string, start: number): number {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < raw.length; i++) {
+    const ch = raw[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) return i;
+    }
+  }
+  return -1;
+}
+
 // Ausweich-Fall, v.a. beim Fallback-Modell llama-3.1-8b-instant beobachtet
 // (live reproduziert nach einem Groq-Tageslimit-Fallback): statt eines
 // einzelnen JSON-Arrays antwortet das Modell manchmal mit mehreren einzelnen
-// [{"speaker":...,"text":...}]-Arrays hintereinander, ein Array pro
-// Gespraechs-Zeile. Der strikte Parse des Gesamttexts (erstes "[" bis
-// letztes "]") schlaegt dann fehl, obwohl jede einzelne Zeile fuer sich
-// valides JSON ist -- deshalb hier jedes Objekt einzeln herausloesen, statt
-// die ganze Audio-Overview-Generierung an einem reinen Formatierungsfehler
-// des schwaecheren Modells scheitern zu lassen.
+// [{"speaker":...,"text":...}]-Arrays hintereinander (oder laesst die
+// umschliessenden eckigen Klammern ganz weg) -- der strikte Parse des
+// Gesamttexts schlaegt dann fehl, obwohl jedes einzelne Objekt fuer sich
+// valides JSON ist. Statt einer festen Feld-Reihenfolge per Regex zu
+// erwarten, wird hier jedes klammer-balancierte "{...}"-Objekt im Rohtext
+// einzeln per echtem JSON.parse gepruft -- robust gegenueber vertauschter
+// Feld-Reihenfolge und zusaetzlichen Feldern, die das Modell einstreut.
 function extractScriptObjects(raw: string): unknown[] | null {
-  const matches = raw.match(/\{\s*"speaker"\s*:\s*"[AB]"\s*,\s*"text"\s*:\s*"(?:[^"\\]|\\.)*"\s*\}/g);
-  if (!matches) return null;
-
-  const objects = matches
-    .map((m) => {
-      try {
-        return JSON.parse(m);
-      } catch {
-        return null;
-      }
-    })
-    .filter((v) => v !== null);
-
+  const objects: unknown[] = [];
+  let i = raw.indexOf("{");
+  while (i !== -1) {
+    const end = findMatchingBrace(raw, i);
+    if (end === -1) break;
+    try {
+      const value = JSON.parse(raw.slice(i, end + 1));
+      if (value && typeof value === "object") objects.push(value);
+    } catch {
+      // Kein valides JSON-Objekt an dieser Stelle -- einfach weitersuchen.
+    }
+    i = raw.indexOf("{", end + 1);
+  }
   return objects.length > 0 ? objects : null;
 }
 
 // Exportiert, damit die JSON-Parsing-/Validierungslogik isoliert testbar ist.
 export function parseAudioScript(raw: string): AudioScriptLine[] {
-  const start = raw.indexOf("[");
-  const end = raw.lastIndexOf("]");
-  if (start === -1 || end === -1 || end < start) {
-    throw new Error("Skript-Antwort enthielt kein JSON-Array.");
-  }
-
-  const parsed = tryParseJsonArray(raw.slice(start, end + 1)) ?? extractScriptObjects(raw);
+  const parsed = tryParseJsonArrayFromBrackets(raw) ?? extractScriptObjects(raw);
   if (!parsed) {
-    throw new Error("Skript-JSON konnte nicht geparst werden.");
+    throw new Error("Skript-Antwort enthielt kein JSON-Array.");
   }
 
   const lines = parsed.filter((item): item is AudioScriptLine => {

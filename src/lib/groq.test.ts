@@ -105,6 +105,24 @@ describe("parseAudioScript", () => {
     ]);
   });
 
+  it("loest einzelne Objekte auch heraus, wenn gar keine umschliessenden eckigen Klammern vorhanden sind", () => {
+    const raw = '{"speaker":"A","text":"Ohne Array"}\n{"speaker":"B","text":"Auch ohne Array"}';
+    expect(parseAudioScript(raw)).toEqual([
+      { speaker: "A", text: "Ohne Array" },
+      { speaker: "B", text: "Auch ohne Array" },
+    ]);
+  });
+
+  it("ist tolerant gegenüber vertauschter Feld-Reihenfolge und zusätzlichen Feldern im Fallback-Fall", () => {
+    const raw =
+      '{"text":"Text zuerst, Speaker danach","speaker":"A"}\n' +
+      '{"speaker":"B","emotion":"happy","text":"Mit Extra-Feld"}';
+    expect(parseAudioScript(raw)).toEqual([
+      { speaker: "A", text: "Text zuerst, Speaker danach" },
+      { speaker: "B", emotion: "happy", text: "Mit Extra-Feld" },
+    ]);
+  });
+
   it("wirft einen Fehler, wenn kein JSON-Array enthalten ist", () => {
     expect(() => parseAudioScript("Das ist kein JSON.")).toThrow(
       "Skript-Antwort enthielt kein JSON-Array."
