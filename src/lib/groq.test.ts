@@ -92,6 +92,19 @@ describe("parseAudioScript", () => {
     ]);
   });
 
+  it("loest einzelne Zeilen heraus, wenn das Modell mehrere separate Arrays statt eines einzigen liefert (live gegen das Fallback-Modell reproduziert)", () => {
+    const raw = [
+      '[{"speaker":"A","text":"Hallo und willkommen!"}]',
+      '[{"speaker":"B","text":"Schön, dass du da bist."}]',
+      '[{"speaker":"A","text":"Fangen wir an."}]',
+    ].join("\n\n");
+    expect(parseAudioScript(raw)).toEqual([
+      { speaker: "A", text: "Hallo und willkommen!" },
+      { speaker: "B", text: "Schön, dass du da bist." },
+      { speaker: "A", text: "Fangen wir an." },
+    ]);
+  });
+
   it("wirft einen Fehler, wenn kein JSON-Array enthalten ist", () => {
     expect(() => parseAudioScript("Das ist kein JSON.")).toThrow(
       "Skript-Antwort enthielt kein JSON-Array."

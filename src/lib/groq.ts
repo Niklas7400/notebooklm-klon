@@ -310,6 +310,41 @@ ${context}`;
   return { script: parseAudioScript(text), usedFallbackModel };
 }
 
+function tryParseJsonArray(candidate: string): unknown[] | null {
+  try {
+    const value = JSON.parse(candidate);
+    return Array.isArray(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+// Ausweich-Fall, v.a. beim Fallback-Modell llama-3.1-8b-instant beobachtet
+// (live reproduziert nach einem Groq-Tageslimit-Fallback): statt eines
+// einzelnen JSON-Arrays antwortet das Modell manchmal mit mehreren einzelnen
+// [{"speaker":...,"text":...}]-Arrays hintereinander, ein Array pro
+// Gespraechs-Zeile. Der strikte Parse des Gesamttexts (erstes "[" bis
+// letztes "]") schlaegt dann fehl, obwohl jede einzelne Zeile fuer sich
+// valides JSON ist -- deshalb hier jedes Objekt einzeln herausloesen, statt
+// die ganze Audio-Overview-Generierung an einem reinen Formatierungsfehler
+// des schwaecheren Modells scheitern zu lassen.
+function extractScriptObjects(raw: string): unknown[] | null {
+  const matches = raw.match(/\{\s*"speaker"\s*:\s*"[AB]"\s*,\s*"text"\s*:\s*"(?:[^"\\]|\\.)*"\s*\}/g);
+  if (!matches) return null;
+
+  const objects = matches
+    .map((m) => {
+      try {
+        return JSON.parse(m);
+      } catch {
+        return null;
+      }
+    })
+    .filter((v) => v !== null);
+
+  return objects.length > 0 ? objects : null;
+}
+
 // Exportiert, damit die JSON-Parsing-/Validierungslogik isoliert testbar ist.
 export function parseAudioScript(raw: string): AudioScriptLine[] {
   const start = raw.indexOf("[");
@@ -318,24 +353,20 @@ export function parseAudioScript(raw: string): AudioScriptLine[] {
     throw new Error("Skript-Antwort enthielt kein JSON-Array.");
   }
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw.slice(start, end + 1));
-  } catch {
+  const parsed = tryParseJsonArray(raw.slice(start, end + 1)) ?? extractScriptObjects(raw);
+  if (!parsed) {
     throw new Error("Skript-JSON konnte nicht geparst werden.");
   }
-  if (!Array.isArray(parsed)) {
-    throw new Error("Skript-Antwort war kein Array.");
-  }
 
-  const lines = parsed.filter(
-    (item): item is AudioScriptLine =>
-      !!item &&
-      typeof item === "object" &&
-      (item.speaker === "A" || item.speaker === "B") &&
-      typeof item.text === "string" &&
-      item.text.trim().length > 0
-  );
+  const lines = parsed.filter((item): item is AudioScriptLine => {
+    if (!item || typeof item !== "object") return false;
+    const candidate = item as Record<string, unknown>;
+    return (
+      (candidate.speaker === "A" || candidate.speaker === "B") &&
+      typeof candidate.text === "string" &&
+      candidate.text.trim().length > 0
+    );
+  });
 
   if (lines.length === 0) {
     throw new Error("Skript enthielt keine gültigen Gesprächs-Zeilen.");
