@@ -18,27 +18,27 @@ Eine Web-App, mit der man:
 
 ## Tech-Stack (verbindlich, bitte nicht abweichen ohne Rücksprache)
 - **Framework:** Next.js (App Router) + TypeScript + Tailwind CSS
-- **PDF-Parsing:** `unpdf` (bevorzugt) oder `pdf-parse`
+- **PDF-Parsing:** `unpdf` (bevorzugt) oder `pdf-parse`. **Nachträglich ergänzt:** Manche (v. a. ältere) PDFs bilden Ligaturen wie "ffi"/"ff" nicht korrekt auf Unicode ab und liefern dort rohe Steuerzeichen statt Buchstaben (beobachtet: ein eingebettetes NUL-Byte anstelle von "ff"). Das ließ den Insert nach Supabase mit einem kryptischen "unsupported Unicode escape sequence"-Fehler scheitern — `extractPdfText` entfernt daher alle Steuerzeichen außer Tab/Zeilenumbruch/Wagenrücklauf, bevor der Text gespeichert wird.
 - **Chunking:** LangChain.js `RecursiveCharacterTextSplitter`, alternativ eine einfache selbstgeschriebene Funktion (max. ~500 Tokens pro Chunk, etwas Overlap)
 - **Embeddings:** Voyage AI API, Modell `voyage-4-lite` (Nachfolgegeneration von `voyage-3.x`; einzige Modelle mit 200 Mio. Freitokens pro Account, `voyage-3.x` hat kein Freikontingent mehr. Default-Dimension 1024, passt zum Schema unten. `voyage-4-lite` gewählt statt `voyage-4`, weil höheres Batch-Token-Limit pro Request (1M statt 320K) und niedrigere Kosten — für ein Demo-Projekt wichtiger als die etwas höhere Retrieval-Qualität von `voyage-4`/`voyage-4-large`). Bei Requests immer `input_type: "query"` bzw. `"document"` setzen — verbessert die Trefferqualität messbar. **Wichtig:** Ohne hinterlegte Zahlungsmethode liegen die Rate-Limits bei 3 RPM/10K TPM — praktisch nicht entwicklungstauglich. Zahlungsmethode am besten direkt an Tag 1 hinterlegen (Freitokens bleiben trotzdem erhalten). **Reranking (nachträglich ergänzt):** gleicher Account/Key, Modell `rerank-2-lite` — Cross-Encoder-Reranking des `match_chunks`-Kandidaten-Pools vor dem Prompt-Bau, siehe Chat/RAG-Flow Schritt 5a unten.
 - **Vektor-Speicher:** Supabase (Postgres + `pgvector`-Extension) — **Supabase JS Client verwenden (REST-basiert)**, keine direkte Postgres-Connection, wegen Connection-Limits in Vercel Serverless Functions
 - **Chat-LLM:** Groq API (OpenAI-kompatible Chat-Completions-API) — Modell `llama-3.3-70b-versatile` für Chat-Antworten und Zusammenfassung, `llama-3.1-8b-instant` für den schnellen Query-Rewriting-Call. Echter Free-Tier ohne Kreditkarte, mir ist keine EU-Einschränkung bekannt (anders als Googles Gemini-Free-Tier, der für Nutzer in EU/EWR/UK/Schweiz zwingend den kostenpflichtigen Modus voraussetzt — für ein Projekt mit Beteiligten in Deutschland relevant). Rate-Limits ca. 30 Anfragen/Min. und niedrig- bis mittel-vierstellig/Tag je Modell — für ein Demo-Projekt ausreichend. Modell-Strings ins README und `.env.example` schreiben; das Free-Modell-Lineup bei Groq ist stabiler als bei Aggregatoren wie OpenRouter, kann sich aber grundsätzlich ändern. **Fallback-Modell (nachträglich ergänzt):** Beim Testen zeigte sich, dass `llama-3.3-70b-versatile` sein Tages-Token-Limit (TPD, Free Tier) bei intensivem Gebrauch tatsächlich erreichen kann — vorher inkonsistent sichtbar: je nachdem, an welcher Stelle im Flow (Skript-Generierung vs. TTS-Synthese) etwas scheiterte, bekam der Nutzer entweder den rohen Groq-Fehler oder eine nichtssagende Sammelmeldung zu sehen. Jetzt einheitlich: Ein 429 des Hauptmodells löst automatisch einen Retry mit `llama-3.1-8b-instant` (separat limitiert) aus, inkl. sichtbarem Hinweis im UI ("Antwort mit Ausweichmodell erstellt"). Gilt für alle Groq-gestützten Features (Chat, Zusammenfassung, Study Guide, Mind Map, Audio-Skript) — ein zentraler Mechanismus in `lib/groq.ts`/`lib/modelFallback.ts` statt Einzellösungen pro Feature. Schlagen auch TTS-Zeilen fehl (z. B. Google-Cloud-Kontingent/Auth-Problem), zeigt die Audio-Overview-Fehlermeldung jetzt die konkrete Ursache statt eines generischen Texts.
-- **Text-to-Speech (für Audio Overview):** Google Cloud Text-to-Speech API — Free Tier ca. 1 Mio. Zeichen/Monat, deutlich mehr Puffer als ElevenLabs (nur 10.000 Zeichen/Monat im Free Tier, zusätzlich Wasserzeichen auf der Ausgabe). Groq selbst bietet zwar TTS an (PlayAI Dialog), aber nur kostenpflichtig ($50/1 Mio. Zeichen, kein Free Tier) — deswegen hierfür ein separater Anbieter. Erfordert ein eigenes Google-Cloud-Projekt mit aktivierter Cloud-TTS-API und hinterlegter Zahlungsmethode (wird innerhalb des Freikontingents nicht belastet). Zwei unterschiedliche Stimmen für die zwei Podcast-Hosts (ursprünglich `de-DE-Wavenet-F`/`-B`, nachträglich auf `de-DE-Chirp3-HD-Kore`/`-Charon` umgestellt — WaveNet sprach englische Fachbegriffe im sonst deutschen Skript mit deutscher Phonetik aus, Chirp3-HD handhabt das robuster; live gegen die echte API verifiziert). Bekannte Restgrenze: auch Chirp3-HD ist nicht perfekt bei Code-Switching, siehe README "Bekannte Grenzen" — Geminis natives Multi-Speaker-TTS wäre der nächste Schritt, hängt aber an einem separaten AI-Studio-Prepay-Konto statt am allgemeinen Cloud-Guthaben und wurde deshalb nicht verfolgt.
+- **Text-to-Speech (für Audio Overview):** Google Cloud Text-to-Speech API — Free Tier ca. 1 Mio. Zeichen/Monat, deutlich mehr Puffer als ElevenLabs (nur 10.000 Zeichen/Monat im Free Tier, zusätzlich Wasserzeichen auf der Ausgabe). Groq selbst bietet zwar TTS an (PlayAI Dialog), aber nur kostenpflichtig ($50/1 Mio. Zeichen, kein Free Tier) — deswegen hierfür ein separater Anbieter. Erfordert ein eigenes Google-Cloud-Projekt mit aktivierter Cloud-TTS-API und hinterlegter Zahlungsmethode (wird innerhalb des Freikontingents nicht belastet). Zwei unterschiedliche Stimmen für die zwei Podcast-Hosts (ursprünglich `de-DE-Wavenet-F`/`-B`, nachträglich auf `de-DE-Chirp3-HD-Kore`/`-Charon` umgestellt — WaveNet sprach englische Fachbegriffe im sonst deutschen Skript mit deutscher Phonetik aus, Chirp3-HD handhabt das robuster; live gegen die echte API verifiziert). Bekannte Restgrenze: auch Chirp3-HD ist nicht perfekt bei Code-Switching, siehe README "Bekannte Grenzen" — Geminis natives Multi-Speaker-TTS wäre der nächste Schritt, hängt aber an einem separaten AI-Studio-Prepay-Konto statt am allgemeinen Cloud-Guthaben und wurde deshalb nicht verfolgt. **Alternative geprüft, verworfen:** Fish Audio (kostenloses `s2.1-pro-free`-Modell, befristet bis 2026-08-31) live getestet — API funktioniert, zwei passende deutsche Stimmen gefunden und gegengehört. Nicht übernommen, weil (1) die Stimmenbibliothek ein offener Community-Marktplatz ohne Kuratierung ist (in derselben deutschen Trefferliste tauchten z. B. geschmacklose Charakter-Stimmen auf — Auswahl bräuchte laufende manuelle Prüfung statt eines einmal getroffenen, stabilen Defaults), (2) der Free-Zugang laut Anbieter explizit befristet und für Produktion nicht gedacht ist ("kein SLA"), und (3) Requests laut AGB zur Modellverbesserung verwendet werden dürfen — bei Google Cloud TTS gibt es diese Klausel nicht. Bei Bedarf jederzeit nachrüstbar, siehe Testartefakte in der Session-Historie.
 - **Deployment:** Vercel, verbunden mit GitHub-Repo für Auto-Deploy bei jedem Push
 
 ## Scope
 
 ### Must-Have (MVP — das muss am Ende funktionieren)
-- [ ] Notebook anlegen, löschen; Quelle löschen; Chat zurücksetzen (Cascade-Constraints im Schema sind schon vorbereitet)
-- [ ] Quellen hochladen: PDF + eingefügter Text
-- [ ] Text-Extraktion → Chunking → Embeddings → Speicherung in Supabase/pgvector
-- [ ] Chat-Interface: Frage stellen, RAG-Antwort bekommen
-- [ ] Antworten enthalten Zitat-Verweise mit kurzen lokalen IDs im Format `[chunk:1]`, `[chunk:2]` … (nicht die volle UUID — LLMs vertippen sich bei langen IDs und erfinden dann welche), serverseitig auf die echten Chunk-IDs zurückgemappt, klickbar → zeigt den referenzierten Ausschnitt in der Sidebar
-- [ ] Automatische Zusammenfassung bei jedem Upload neu erzeugt (nicht nur beim ersten), **persistent gespeichert** (nicht nur einmalig in der UI angezeigt — sonst weg nach Reload, oder veraltet nach der zweiten Quelle)
-- [ ] Chatverlauf wird beim erneuten Öffnen eines Notebooks aus `messages` geladen und im UI angezeigt (sonst wirkt es wie ein Bug, wenn er nach Reload leer ist)
-- [ ] Chat in einem leeren Notebook (noch keine Quelle hochgeladen) zeigt einen Hinweis ("Lade zuerst eine Quelle hoch"), statt Embedding/Suche ins Leere zu schicken
-- [ ] Row Level Security auf allen Supabase-Tabellen aktiv, alle DB-Zugriffe laufen serverseitig über den Service-Role-Key — der `ANON_KEY` landet im Client-Bundle und darf ohne RLS nicht lese-/schreibfähig auf die DB sein
-- [ ] Das vorbefüllte Demo-Notebook lässt sich nicht versehentlich über die Löschen-Funktion entfernen (sonst sieht der nächste Reviewer eine leere App)
+- [x] Notebook anlegen, löschen; Quelle löschen; Chat zurücksetzen (Cascade-Constraints im Schema sind schon vorbereitet). **Nachträglich ergänzt:** Quelle löschen stößt zusätzlich eine Neu-Generierung der Zusammenfassung an (sonst würde sie noch Inhalte einer nicht mehr vorhandenen Quelle referenzieren).
+- [x] Quellen hochladen: PDF + eingefügter Text
+- [x] Text-Extraktion → Chunking → Embeddings → Speicherung in Supabase/pgvector
+- [x] Chat-Interface: Frage stellen, RAG-Antwort bekommen
+- [x] Antworten enthalten Zitat-Verweise mit kurzen lokalen IDs im Format `[chunk:1]`, `[chunk:2]` … (nicht die volle UUID — LLMs vertippen sich bei langen IDs und erfinden dann welche), serverseitig auf die echten Chunk-IDs zurückgemappt, klickbar → zeigt den referenzierten Ausschnitt unten im Chat. **Nachträglich ergänzt:** ein Klick klappt zusätzlich die zugehörige Quelle in der linken Sidebar auf und hebt die zitierte Textstelle dort farblich hervor (Scroll-in-View), statt nur den Ausschnitt am Chat-Ende zu zeigen.
+- [x] Automatische Zusammenfassung bei jedem Upload neu erzeugt (nicht nur beim ersten), **persistent gespeichert** (nicht nur einmalig in der UI angezeigt — sonst weg nach Reload, oder veraltet nach der zweiten Quelle)
+- [x] Chatverlauf wird beim erneuten Öffnen eines Notebooks aus `messages` geladen und im UI angezeigt (sonst wirkt es wie ein Bug, wenn er nach Reload leer ist)
+- [x] Chat in einem leeren Notebook (noch keine Quelle hochgeladen) zeigt einen Hinweis ("Lade zuerst eine Quelle hoch"), statt Embedding/Suche ins Leere zu schicken
+- [x] Row Level Security auf allen Supabase-Tabellen aktiv, alle DB-Zugriffe laufen serverseitig über den Service-Role-Key — der `ANON_KEY` landet im Client-Bundle und darf ohne RLS nicht lese-/schreibfähig auf die DB sein
+- [x] Das vorbefüllte Demo-Notebook lässt sich nicht versehentlich über die Löschen-Funktion entfernen (sonst sieht der nächste Reviewer eine leere App)
 
 ### Nice-to-have (in dieser Reihenfolge — Audio Overview ist bewusst vor die ursprünglichen Punkte 1/3 gerutscht, siehe Begründung oben)
 1. Streaming-Antworten im Chat (statt auf einmal)
@@ -208,6 +208,8 @@ Für den MVP reicht `match_source_ids: null` (alle Quellen durchsuchen); der Par
 
 > Beim Öffnen eines bestehenden Notebooks: alle `messages` des Notebooks laden und im Chat-UI anzeigen (nicht nur beim Senden einer neuen Frage) — sonst wirkt der Chat nach einem Reload wie zurückgesetzt.
 
+> **Folgefragen-Grounding (nachträglich ergänzt):** Die vorgeschlagenen Folgefragen wurden ursprünglich nur aus Frage + Antworttext generiert, nie aus den tatsächlich gefundenen Chunks. Das fiel besonders nach dem Modell-Fallback auf `llama-3.1-8b-instant` auf (schwächeres Modell, konnte den fehlenden Kontext schlechter kompensieren) und führte zu Folgefragen, die die Quellen gar nicht beantworten können. Root Cause war unabhängig vom Fallback-Modell selbst: Der Prompt bekam einfach zu wenig Kontext. Fix: `sourceContext` (die vollen Chunk-Inhalte aus Schritt 5) wird jetzt zusätzlich in den Folgefragen-Prompt gegeben, plus ein `hasCitation`-Heuristik-Guard, der die Folgefragen-Generierung ganz überspringt, wenn die Antwort selbst kein `[chunk:N]`-Zitat enthält (typisch für Ablehnungsantworten "steht nicht in den Quellen").
+
 ### 3. System-Prompt-Vorlage für RAG
 ```
 Du bist ein Assistent, der ausschließlich auf Basis der bereitgestellten Quellenausschnitte antwortet.
@@ -318,14 +320,14 @@ SUPABASE_SERVICE_ROLE_KEY=
 - In der Antwortmail: das Passwort fürs Deployment mitschicken plus ein Satz, dass das Demo-Notebook vorbefüllt ist und man direkt Fragen stellen kann — der Reviewer soll nicht raten müssen, was zu tun ist
 
 ## Definition of Done
-- [ ] Notebook mit mindestens 2 Quellen anlegbar
-- [ ] Chat beantwortet Fragen korrekt aus den Quellen
-- [ ] Zitate sind sichtbar und nachvollziehbar
-- [ ] Zusammenfassung erscheint automatisch nach Upload und bleibt nach Reload erhalten
-- [ ] Chatverlauf bleibt nach Reload sichtbar
-- [ ] Folgefragen funktionieren mit echtem Kontextbezug (nicht nur bei expliziter Wiederholung des Themas)
-- [ ] Quelle/Notebook lassen sich löschen
-- [ ] RLS ist auf allen Tabellen aktiv, DB-Zugriffe laufen nur serverseitig
-- [ ] Demo-Deployment ist gegen unautorisierten Zugriff geschützt
-- [ ] Live-Deployment funktioniert (nicht nur lokal getestet)
-- [ ] README ist vollständig und verständlich
+- [x] Notebook mit mindestens 2 Quellen anlegbar
+- [x] Chat beantwortet Fragen korrekt aus den Quellen
+- [x] Zitate sind sichtbar und nachvollziehbar
+- [x] Zusammenfassung erscheint automatisch nach Upload und bleibt nach Reload erhalten
+- [x] Chatverlauf bleibt nach Reload sichtbar
+- [x] Folgefragen funktionieren mit echtem Kontextbezug (nicht nur bei expliziter Wiederholung des Themas)
+- [x] Quelle/Notebook lassen sich löschen
+- [x] RLS ist auf allen Tabellen aktiv, DB-Zugriffe laufen nur serverseitig
+- [x] Demo-Deployment ist gegen unautorisierten Zugriff geschützt
+- [x] Live-Deployment funktioniert (nicht nur lokal getestet)
+- [x] README ist vollständig und verständlich
