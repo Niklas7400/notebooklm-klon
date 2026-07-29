@@ -43,3 +43,30 @@ Negativ-Beispiel verstärken (Frage ohne passende Ausschnitte + korrekte
 Ablehnungsantwort als Vorbild), aehnlich wie beim Zitat-Format-Beispiel
 weiter oben. Bringt vermutlich nicht 100% Zuverlässigkeit, sollte die
 Haeufigkeit aber senken.
+
+## TTS-Aussprache englischer Fachbegriffe im Audio Overview
+
+Beobachtet beim Testen (Tag 8): Mit den urspruenglichen WaveNet-Stimmen
+sprach Google Cloud TTS englische Fachbegriffe im sonst deutschen
+Podcast-Skript (RAG, Embedding, Voice AI Agents, ...) mit deutscher
+Phonetik aus, weil die gesamte Zeile mit `languageCode: "de-DE"`
+synthetisiert wird -- keine Sprach-Erkennung pro Wort. Umgestellt auf
+`de-DE-Chirp3-HD-Kore`/`-Charon` (Gemini-basiertes Voice-Modell,
+handhabt Code-Switching robuster); deutlich besser laut Nutzer-Feedback,
+aber nicht perfekt.
+
+Zwei weitere Stufen bewusst nicht verfolgt (kein akutes Problem mehr,
+kostet zusaetzliches Geld/Setup):
+- SSML mit expliziten `<lang xml:lang="en-US">`-Tags um erkannte
+  englische Begriffe -- braucht eine Erkennung, welche Woerter englisch
+  sind (z.B. Groq beim Skript-Generieren mit einem Marker umschliessen
+  lassen), neues Formatrisiko aehnlich den beiden Eintraegen oben.
+- Geminis natives Multi-Speaker-TTS (`gemini-2.5-flash-preview-tts`) --
+  live getestet, funktioniert technisch mit demselben Google-Cloud-
+  API-Key (nur "Generative Language API" + API-Key-Restriction musste
+  freigeschaltet werden), haengt aber an einem separaten AI-Studio-
+  Prepay-Konto statt am allgemeinen Cloud-Guthaben. Ohne Aufladen dieses
+  getrennten Kontos nicht nutzbar.
+
+ElevenLabs als Alternative von Anfang an ausgeschlossen (siehe CLAUDE.md
+Tech-Stack-Begruendung: 10.000 Zeichen/Monat Free Tier + Wasserzeichen).

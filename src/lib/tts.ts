@@ -4,9 +4,9 @@ const TTS_URL = "https://texttospeech.googleapis.com/v1/text:synthesize";
 // Chirp3-HD statt WaveNet (nachtraeglich gewechselt): WaveNet spricht englische
 // Fachbegriffe im sonst deutschen Skript (RAG, Embedding, Voice AI Agents, ...)
 // mit deutscher Phonetik aus. Chirp3-HD (Gemini-basiertes TTS-Modell) handhabt
-// eingebettete Fremdwoerter laut Google-Doku deutlich robuster. Live gegen die
-// echte API getestet (siehe Commit) -- falls das nicht ausreicht, naechster
-// Schritt waere SSML mit expliziten <lang>-Tags um englische Begriffe.
+// eingebettete Fremdwoerter laut Google-Doku deutlich robuster (per
+// Nutzer-Feedback bestaetigt, aber nicht perfekt) -- siehe NOTES.md fuer
+// bewusst nicht verfolgte weitere Schritte (SSML-<lang>-Tags, Gemini-TTS).
 const VOICE_BY_SPEAKER: Record<"A" | "B", string> = {
   A: "de-DE-Chirp3-HD-Kore",
   B: "de-DE-Chirp3-HD-Charon",
