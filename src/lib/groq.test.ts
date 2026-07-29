@@ -123,6 +123,23 @@ describe("parseAudioScript", () => {
     ]);
   });
 
+  it("findet verschachtelte Zeilen, wenn die umschliessende Wrapper-Klammer selbst wegen eines Trailing-Kommas ungueltig ist", () => {
+    const raw = '{"script": [{"speaker":"A","text":"Hallo"}, {"speaker":"B","text":"Hi"},]}';
+    expect(parseAudioScript(raw)).toEqual([
+      { speaker: "A", text: "Hallo" },
+      { speaker: "B", text: "Hi" },
+    ]);
+  });
+
+  it("findet bereits vollstaendige Zeilen, auch wenn die Antwort mitten in der naechsten Zeile abgeschnitten ist", () => {
+    const raw =
+      '{"script":[{"speaker":"A","text":"Hallo"},{"speaker":"B","text":"Hi"},{"speaker":"A","text":"Trunc';
+    expect(parseAudioScript(raw)).toEqual([
+      { speaker: "A", text: "Hallo" },
+      { speaker: "B", text: "Hi" },
+    ]);
+  });
+
   it("wirft einen Fehler, wenn kein JSON-Array enthalten ist", () => {
     expect(() => parseAudioScript("Das ist kein JSON.")).toThrow(
       "Skript-Antwort enthielt kein JSON-Array."

@@ -370,14 +370,26 @@ function extractScriptObjects(raw: string): unknown[] | null {
   let i = raw.indexOf("{");
   while (i !== -1) {
     const end = findMatchingBrace(raw, i);
-    if (end === -1) break;
+    if (end === -1) {
+      // Diese "{" hat keine passende "}" (z.B. eine Wrapper-Klammer um
+      // eine abgeschnittene Antwort) -- nicht die ganze Suche abbrechen,
+      // sondern ab der naechsten "{" weitersuchen, falls darin vollstaendige
+      // Objekte stecken (z.B. bereits abgeschlossene Gespraechs-Zeilen vor
+      // dem Abbruch).
+      i = raw.indexOf("{", i + 1);
+      continue;
+    }
     try {
       const value = JSON.parse(raw.slice(i, end + 1));
-      if (value && typeof value === "object") objects.push(value);
+      objects.push(value);
+      i = raw.indexOf("{", end + 1);
     } catch {
-      // Kein valides JSON-Objekt an dieser Stelle -- einfach weitersuchen.
+      // Kein valides JSON-Objekt an dieser Stelle -- oft eine Wrapper-
+      // Klammer mit z.B. einem Trailing-Komma im inneren Array. Ab der
+      // naechsten "{" weitersuchen (i + 1, nicht end + 1), damit darin
+      // verschachtelte valide Objekte trotzdem gefunden werden.
+      i = raw.indexOf("{", i + 1);
     }
-    i = raw.indexOf("{", end + 1);
   }
   return objects.length > 0 ? objects : null;
 }
