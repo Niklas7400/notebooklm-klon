@@ -123,6 +123,14 @@ export async function POST(
       buffers.push(...batchResults);
     }
 
+    // Cache-Busting-Suffix fuer alle Clips dieser Generierung: der Storage-
+    // Pfad ist deterministisch (notebookId/i.mp3) und wird bei jeder
+    // Neu-Generierung per upsert ueberschrieben, die Public-URL bliebe also
+    // sonst identisch. Browser (und ggf. ein CDN davor) cachen Audio-Dateien
+    // aggressiv pro URL und wuerden nach einem "Neu generieren" weiterhin die
+    // alte, gecachte Version abspielen, ohne dass der geaenderte Inhalt
+    // ueberhaupt neu angefragt wird.
+    const generatedAt = Date.now();
     const clipUrls: (string | null)[] = [];
     for (let i = 0; i < buffers.length; i++) {
       const buffer = buffers[i];
@@ -140,7 +148,7 @@ export async function POST(
         continue;
       }
       const { data: publicUrlData } = supabase.storage.from(AUDIO_BUCKET).getPublicUrl(path);
-      clipUrls.push(publicUrlData.publicUrl);
+      clipUrls.push(`${publicUrlData.publicUrl}?v=${generatedAt}`);
     }
 
     // audio_status nur dann 'failed', wenn wirklich nichts brauchbares
