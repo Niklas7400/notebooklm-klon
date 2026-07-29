@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { AudioScriptLine, AudioStatus } from "@/lib/types";
+import { FALLBACK_MODEL_NOTICE } from "@/lib/modelFallback";
 
 // Sequenzielle Wiedergabe der TTS-Clips -- kein serverseitiges
 // Audio-Zusammenschneiden noetig, der naechste Clip startet automatisch
@@ -36,6 +37,7 @@ export function AudioOverview({
   const [status, setStatus] = useState<AudioStatus>(initialStatus);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [usedFallbackModel, setUsedFallbackModel] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [sectionOpen, setSectionOpen] = useState(false);
@@ -52,6 +54,7 @@ export function AudioOverview({
   async function handleGenerate() {
     setGenerating(true);
     setError(null);
+    setUsedFallbackModel(false);
     setIsPlaying(false);
     setCurrentIndex(-1);
     setSectionOpen(true);
@@ -66,8 +69,13 @@ export function AudioOverview({
       setScript(body.script);
       setClipUrls(body.clipUrls);
       setStatus(body.audioStatus);
+      setUsedFallbackModel(Boolean(body.usedFallbackModel));
       if (body.audioStatus === "failed") {
-        setError("Kein einziger Audio-Clip konnte erzeugt werden.");
+        // Den konkreten, vom Server ermittelten Grund zeigen (z.B. welcher
+        // Dienst genau fehlgeschlagen ist) statt einer nichtssagenden
+        // Sammelmeldung -- nur als Fallback greifen, falls der Server aus
+        // irgendeinem Grund keinen Grund mitliefern konnte.
+        setError(body.error ?? "Kein einziger Audio-Clip konnte erzeugt werden.");
       }
     } catch {
       setStatus("failed");
@@ -198,6 +206,9 @@ export function AudioOverview({
             </p>
           )}
           {!generating && error && <p className="m-0 text-xs text-danger">{error}</p>}
+          {!generating && usedFallbackModel && (
+            <p className="m-0 text-xs text-neutral-500">{FALLBACK_MODEL_NOTICE}</p>
+          )}
           {!generating && !error && !hasSources && (
             <p className="m-0 text-xs text-neutral-500">Erst eine Quelle hochladen.</p>
           )}

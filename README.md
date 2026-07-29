@@ -30,7 +30,7 @@ Next.js (App Router) als Frontend und API-Layer in einem, Supabase/Postgres mit 
 | Chunking | LangChain.js `RecursiveCharacterTextSplitter` | ~1800 Zeichen/Chunk (≈500 Tokens), 200 Zeichen Overlap |
 | Embeddings & Reranking | Voyage AI, `voyage-4-lite` (Embeddings) + `rerank-2-lite` (Reranking) | 200 Mio. Freitokens/Account, hohes Batch-Limit (1M Tokens/Request); gleicher Account/Key für beide Modelle |
 | Vektor-Speicher | Supabase (Postgres + `pgvector`) | REST-basierter JS-Client statt direkter Postgres-Connection (Connection-Limits in Serverless Functions) |
-| Chat-LLM | Groq, `llama-3.3-70b-versatile` (Chat/Zusammenfassung), `llama-3.1-8b-instant` (Query-Rewriting) | Echter Free-Tier ohne Kreditkarte, keine EU-Einschränkung |
+| Chat-LLM | Groq, `llama-3.3-70b-versatile` (Chat/Zusammenfassung), `llama-3.1-8b-instant` (Query-Rewriting) | Echter Free-Tier ohne Kreditkarte, keine EU-Einschränkung; automatischer Fallback auf `llama-3.1-8b-instant`, falls das Tageslimit von `llama-3.3-70b-versatile` erreicht ist (mit Hinweis im UI) |
 | Text-to-Speech | Google Cloud TTS (Chirp3-HD), Stimmen `de-DE-Chirp3-HD-Kore` / `de-DE-Chirp3-HD-Charon` | ~1 Mio. Freizeichen/Monat, zwei unterschiedliche Stimmen für die zwei Podcast-Hosts; Chirp3-HD statt WaveNet wegen deutlich robusterer Aussprache eingebetteter englischer Fachbegriffe (siehe Bekannte Grenzen) |
 | Mind-Map-Rendering | [Markmap](https://markmap.js.org/) (`markmap-lib` + `markmap-view`) | Nimmt dem LLM die Baum-Layout-Arbeit ab; erwartet als Eingabe eine simple verschachtelte Markdown-Gliederung statt strengem JSON — robusteres LLM-Ausgabeformat |
 | Deployment | Vercel | Auto-Deploy bei Push auf `main` |
@@ -63,7 +63,7 @@ SITE_PASSWORD=                   # Middleware-Passwort-Gate, leer lassen = kein 
 npm test
 ```
 
-48 Unit-Tests über 7 Dateien für die reine, von externen APIs unabhängige Logik: Chunker, Zitat-Parser, Leertext-Validierung, HTML-Extraktion für URL-Quellen, RAG-Prompt-/Zitat-Aufbau, relative Datumsanzeige, das Parsen der Audio-Overview-Skript-Antwort, das Entfernen von Codeblock-Wrappern aus der Mind-Map-Markdown-Antwort und das Abtrennen der Folgefragen vom Chat-Antwort-Stream — die Stellen, an denen sich Formatannahmen am leichtesten stillschweigend brechen lassen. Funktionen mit echten API-Calls (Groq, Voyage, Google TTS, Supabase) sind bewusst nicht unit-getestet, sondern manuell gegen die echte Umgebung verifiziert (siehe Commit-Historie).
+60 Unit-Tests über 8 Dateien für die reine, von externen APIs unabhängige Logik: Chunker, Zitat-Parser, Leertext-Validierung, HTML-Extraktion für URL-Quellen, RAG-Prompt-/Zitat-Aufbau, relative Datumsanzeige, das Parsen der Audio-Overview-Skript-Antwort, das Entfernen von Codeblock-Wrappern aus der Mind-Map-Markdown-Antwort, das Abtrennen der Folgefragen vom Chat-Antwort-Stream, das Entfernen von Steuerzeichen aus PDF-Text und die Groq-Fallback-Modell-Logik (mit gemocktem `fetch`, ohne echten Netzwerk-Call) — die Stellen, an denen sich Formatannahmen am leichtesten stillschweigend brechen lassen. Funktionen mit echten API-Calls (Groq, Voyage, Google TTS, Supabase) sind ansonsten bewusst nicht unit-getestet, sondern manuell gegen die echte Umgebung verifiziert (siehe Commit-Historie).
 
 ## Bewusste Scope-Entscheidungen
 

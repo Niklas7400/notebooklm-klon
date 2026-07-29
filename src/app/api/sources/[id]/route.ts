@@ -49,9 +49,9 @@ export async function DELETE(
   // (CLAUDE.md), nicht nur beim Hinzufuegen -- sonst bliebe nach dem Loeschen
   // einer Quelle eine veraltete Zusammenfassung stehen (oder eine ganz
   // falsche, falls das die letzte Quelle war).
-  const summary = source?.notebook_id
+  const { summary, usedFallbackModel } = source?.notebook_id
     ? await regenerateNotebookSummary(supabase, source.notebook_id)
-    : null;
+    : { summary: null, usedFallbackModel: false };
 
-  return Response.json({ summary });
+  return Response.json({ summary, usedFallbackModel });
 }

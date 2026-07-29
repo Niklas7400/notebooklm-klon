@@ -44,9 +44,9 @@ export async function POST(
     .map((s) => `Quelle: ${s.filename}\n${(chunksBySource.get(s.id) ?? []).join("\n")}`)
     .join("\n\n");
 
-  const studyGuide = await generateStudyGuide(context);
+  const { text: studyGuide, usedFallbackModel } = await generateStudyGuide(context);
 
   await supabase.from("notebooks").update({ study_guide: studyGuide }).eq("id", notebookId);
 
-  return Response.json({ studyGuide });
+  return Response.json({ studyGuide, usedFallbackModel });
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { FALLBACK_MODEL_NOTICE } from "@/lib/modelFallback";
 
 // Sehr schlanker Markdown-Renderer (nur "## Ueberschrift" und "**fett**") --
 // fuer den Umfang dieses Features reicht das, statt eine Markdown-Bibliothek
@@ -49,10 +50,12 @@ export function StudyGuide({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [usedFallbackModel, setUsedFallbackModel] = useState(false);
 
   async function handleGenerate() {
     setLoading(true);
     setError(null);
+    setUsedFallbackModel(false);
     try {
       const res = await fetch(`/api/notebooks/${notebookId}/study-guide`, { method: "POST" });
       const body = await res.json().catch(() => null);
@@ -61,6 +64,7 @@ export function StudyGuide({
         return;
       }
       setStudyGuide(body.studyGuide);
+      setUsedFallbackModel(Boolean(body.usedFallbackModel));
       setOpen(true);
     } catch {
       setError("Netzwerkfehler bei der Generierung.");
@@ -122,6 +126,9 @@ export function StudyGuide({
             <p className="m-0 text-xs text-neutral-500">Erst eine Quelle hochladen.</p>
           )}
           {error && <p className="m-0 text-xs text-danger">{error}</p>}
+          {usedFallbackModel && (
+            <p className="m-0 mb-1.5 text-xs text-neutral-500">{FALLBACK_MODEL_NOTICE}</p>
+          )}
           {studyGuide && (
             <div className="max-h-[32rem] overflow-y-auto rounded-md border border-divider p-2.5">
               {renderMarkdownLite(studyGuide)}

@@ -64,6 +64,7 @@ export function GenerateSidebar({
   hasSources,
   summary,
   summarizing,
+  summaryUsedFallbackModel,
   summaryOpen,
   onToggleSummary,
   initialStudyGuide,
@@ -76,6 +77,7 @@ export function GenerateSidebar({
   hasSources: boolean;
   summary: string | null;
   summarizing: boolean;
+  summaryUsedFallbackModel: boolean;
   summaryOpen: boolean;
   onToggleSummary: () => void;
   initialStudyGuide: string | null;
@@ -124,6 +126,7 @@ export function GenerateSidebar({
           <Summary
             summary={summary}
             summarizing={summarizing}
+            usedFallbackModel={summaryUsedFallbackModel}
             open={summaryOpen}
             onToggle={onToggleSummary}
           />

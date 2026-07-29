@@ -1,13 +1,43 @@
 import type { AudioScriptLine } from "@/lib/types";
+import { FALLBACK_MODEL_MARKER } from "@/lib/modelFallback";
 
 const GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 const CHAT_MODEL = "llama-3.3-70b-versatile";
+// Faellt automatisch auf dieses Modell zurueck, wenn CHAT_MODEL sein
+// Tageslimit (TPD) erreicht hat -- separat limitiert, bereits an anderer
+// Stelle (Query-Rewriting) erprobt. Eine schwaechere Antwort mit Hinweis ist
+// besser als ein rohes Rate-Limit-Fehler, das der Nutzer nicht einordnen kann.
+const CHAT_MODEL_FALLBACK = "llama-3.1-8b-instant";
 const REWRITE_MODEL = "llama-3.1-8b-instant";
 
 export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
 
-async function groqChat(model: string, messages: ChatMessage[]): Promise<string> {
+function isRateLimitStatus(status: number): boolean {
+  return status === 429;
+}
+
+// Groq liefert Fehler als {"error":{"message":"...","type":"...","code":"..."}}
+// -- die reine .message ist fuer den Nutzer deutlich lesbarer als der ganze
+// rohe JSON-Body (inkl. system_fingerprint etc.), der vorher 1:1 durchgereicht
+// wurde.
+function extractGroqErrorMessage(body: string): string {
+  try {
+    const parsed = JSON.parse(body) as { error?: { message?: string } };
+    if (typeof parsed.error?.message === "string") return parsed.error.message;
+  } catch {
+    // body war kein JSON -- Rohtext unveraendert weiterreichen.
+  }
+  return body;
+}
+
+export type GroqCallResult = { text: string; usedFallbackModel: boolean };
+
+async function groqChat(
+  model: string,
+  messages: ChatMessage[],
+  fallbackModel?: string
+): Promise<GroqCallResult> {
   const res = await fetch(GROQ_CHAT_URL, {
     method: "POST",
     headers: {
@@ -19,11 +49,15 @@ async function groqChat(model: string, messages: ChatMessage[]): Promise<string>
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Groq-Request fehlgeschlagen (${res.status}): ${body}`);
+    if (isRateLimitStatus(res.status) && fallbackModel) {
+      const fallback = await groqChat(fallbackModel, messages);
+      return { text: fallback.text, usedFallbackModel: true };
+    }
+    throw new Error(`Groq (${model}, Status ${res.status}): ${extractGroqErrorMessage(body)}`);
   }
 
   const json = await res.json();
-  return json.choices[0].message.content as string;
+  return { text: json.choices[0].message.content as string, usedFallbackModel: false };
 }
 
 // Formt Frage + Verlauf zu einer eigenstaendigen Suchanfrage um (Folgefragen
@@ -44,20 +78,8 @@ ${historyText}
 
 Frage: ${question}`;
 
-  const result = await groqChat(REWRITE_MODEL, [{ role: "user", content: prompt }]);
-  return result.trim();
-}
-
-export function answerQuestion(
-  systemPrompt: string,
-  history: ChatMessage[],
-  question: string
-): Promise<string> {
-  return groqChat(CHAT_MODEL, [
-    { role: "system", content: systemPrompt },
-    ...history,
-    { role: "user", content: question },
-  ]);
+  const { text } = await groqChat(REWRITE_MODEL, [{ role: "user", content: prompt }]);
+  return text.trim();
 }
 
 // Streaming-Variante fuer den Chat (Tag 6): liefert die Antwort als Folge von
@@ -75,18 +97,43 @@ export async function* streamAnswerQuestion(
     { role: "user", content: question },
   ];
 
-  const res = await fetch(GROQ_CHAT_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ model: CHAT_MODEL, messages, stream: true }),
-  });
+  function requestStream(model: string) {
+    return fetch(GROQ_CHAT_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ model, messages, stream: true }),
+    });
+  }
 
-  if (!res.ok || !res.body) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Groq-Streaming-Request fehlgeschlagen (${res.status}): ${body}`);
+  let res = await requestStream(CHAT_MODEL);
+  let usedFallbackModel = false;
+
+  if (!res.ok) {
+    const primaryBody = await res.text().catch(() => "");
+    if (isRateLimitStatus(res.status)) {
+      // Gleiche Fallback-Logik wie in groqChat, hier von Hand nachgebaut, weil
+      // der Streaming-Response-Body nicht durch groqChat laeuft.
+      usedFallbackModel = true;
+      res = await requestStream(CHAT_MODEL_FALLBACK);
+    }
+    if (!res.ok) {
+      const body = usedFallbackModel ? await res.text().catch(() => "") : primaryBody;
+      throw new Error(`Groq (Status ${res.status}): ${extractGroqErrorMessage(body)}`);
+    }
+  }
+
+  if (!res.body) {
+    throw new Error("Groq-Streaming-Antwort enthielt keinen Body.");
+  }
+
+  // Sentinel als allererster Chunk, noch vor dem eigentlichen Antworttext --
+  // der Client kann so sofort erkennen, dass eine Antwort vom Ausweichmodell
+  // folgt (siehe lib/modelFallback.ts fuer das Herausfiltern beim Anzeigen).
+  if (usedFallbackModel) {
+    yield FALLBACK_MODEL_MARKER;
   }
 
   const reader = res.body.getReader();
@@ -117,13 +164,13 @@ export async function* streamAnswerQuestion(
 // Notebook Guide: kurze Zusammenfassung ueber alle Quellen, bei jedem Upload
 // neu erzeugt (nicht nur beim ersten), damit sie nach dem zweiten Upload
 // nicht veraltet wirkt.
-export function summarizeSources(context: string): Promise<string> {
+export function summarizeSources(context: string): Promise<GroqCallResult> {
   const prompt = `Erstelle eine kurze, gut lesbare Zusammenfassung ("Notebook Guide") der folgenden Quellen fuer jemanden, der sich schnell einen Ueberblick verschaffen will. 3-6 Saetze oder kurze Bullet Points, die die Kernaussagen aller Quellen zusammen abdecken. Antworte in der Sprache der Quellen.
 
 Quellen:
 ${context}`;
 
-  return groqChat(CHAT_MODEL, [{ role: "user", content: prompt }]);
+  return groqChat(CHAT_MODEL, [{ role: "user", content: prompt }], CHAT_MODEL_FALLBACK);
 }
 
 // Vorgeschlagene Einstiegsfragen (optionales Feature): nach jedem Upload neu
@@ -135,8 +182,8 @@ export async function generateSuggestedQuestions(context: string): Promise<strin
 Quellen:
 ${context}`;
 
-  const raw = await groqChat(REWRITE_MODEL, [{ role: "user", content: prompt }]);
-  return raw
+  const { text } = await groqChat(REWRITE_MODEL, [{ role: "user", content: prompt }]);
+  return text
     .split("\n")
     .map((line) => line.replace(/^[\s\-*\d.)]+/, "").trim())
     // Llama haelt sich trotz "ohne Einleitung" gelegentlich nicht daran und
@@ -159,8 +206,8 @@ export async function generateFollowUpQuestions(
 Frage: ${question}
 Antwort: ${answer}`;
 
-  const raw = await groqChat(REWRITE_MODEL, [{ role: "user", content: prompt }]);
-  return raw
+  const { text } = await groqChat(REWRITE_MODEL, [{ role: "user", content: prompt }]);
+  return text
     .split("\n")
     .map((line) => line.replace(/^[\s\-*\d.)]+/, "").trim())
     .filter((line) => line.endsWith("?"))
@@ -171,7 +218,7 @@ Antwort: ${answer}`;
 // persistiert (im Gegensatz zum Notebook Guide) -- bei Bedarf neu generiert.
 // Genau zwei fest vorgegebene Abschnittsueberschriften statt eines "oder"
 // zwischen Formaten, siehe NOTES.md zum Zusammenfassungs-Prompt-Problem.
-export function generateStudyGuide(context: string): Promise<string> {
+export function generateStudyGuide(context: string): Promise<GroqCallResult> {
   const prompt = `Erstelle einen Study Guide zu den folgenden Quellen mit GENAU diesen zwei Abschnitten (als Markdown-Ueberschriften):
 
 ## Kernkonzepte
@@ -185,7 +232,7 @@ Antworte in der Sprache der Quellen. Nur diese zwei Abschnitte, keine Einleitung
 Quellen:
 ${context}`;
 
-  return groqChat(CHAT_MODEL, [{ role: "user", content: prompt }]);
+  return groqChat(CHAT_MODEL, [{ role: "user", content: prompt }], CHAT_MODEL_FALLBACK);
 }
 
 // Entfernt einen ```-Codeblock-Wrapper, falls Llama die Markdown-Antwort
@@ -202,7 +249,7 @@ export function stripMarkdownCodeFence(text: string): string {
 // Llama dieses Format schon beim Study Guide zuverlaessig liefert. Das
 // Frontend rendert die Gliederung per Markmap zu einer interaktiven Mind Map
 // -- die Baum-Layout-Arbeit uebernimmt die Bibliothek, nicht der Prompt.
-export async function generateMindMap(context: string): Promise<string> {
+export async function generateMindMap(context: string): Promise<GroqCallResult> {
   const prompt = `Erstelle eine Mind Map als verschachtelte Markdown-Gliederung zu den folgenden Quellen.
 
 Format (Beispiel, nur zur Veranschaulichung des Formats):
@@ -224,14 +271,20 @@ Regeln:
 Quellen:
 ${context}`;
 
-  const raw = await groqChat(CHAT_MODEL, [{ role: "user", content: prompt }]);
-  return stripMarkdownCodeFence(raw);
+  const { text, usedFallbackModel } = await groqChat(
+    CHAT_MODEL,
+    [{ role: "user", content: prompt }],
+    CHAT_MODEL_FALLBACK
+  );
+  return { text: stripMarkdownCodeFence(text), usedFallbackModel };
 }
 
 // Audio Overview (Tag 8): lockeres Zwei-Personen-Podcast-Skript als JSON.
 // Auf Anfrage generiert, nicht bei jedem Upload (siehe CLAUDE.md) -- TTS hat
 // im Gegensatz zu Groq ein begrenztes Freikontingent.
-export async function generateAudioScript(context: string): Promise<AudioScriptLine[]> {
+export async function generateAudioScript(
+  context: string
+): Promise<{ script: AudioScriptLine[]; usedFallbackModel: boolean }> {
   const prompt = `Erstelle ein lockeres Zwei-Personen-Podcast-Gespräch (Host A und Host B) auf Basis der folgenden Notebook-Inhalte. Ca. 3-5 Minuten Sprechzeit (etwa 12-18 kurze Gesprächs-Zeilen), locker und natürlich im Ton, für Laien verständlich, greift die Kernaussagen der Quellen auf. Antworte in der Sprache der Quellen.
 
 Antworte AUSSCHLIESSLICH mit einem JSON-Array in genau diesem Format, ohne Markdown-Codeblock und ohne Text davor oder danach:
@@ -240,8 +293,12 @@ Antworte AUSSCHLIESSLICH mit einem JSON-Array in genau diesem Format, ohne Markd
 Notebook-Inhalte:
 ${context}`;
 
-  const raw = await groqChat(CHAT_MODEL, [{ role: "user", content: prompt }]);
-  return parseAudioScript(raw);
+  const { text, usedFallbackModel } = await groqChat(
+    CHAT_MODEL,
+    [{ role: "user", content: prompt }],
+    CHAT_MODEL_FALLBACK
+  );
+  return { script: parseAudioScript(text), usedFallbackModel };
 }
 
 // Exportiert, damit die JSON-Parsing-/Validierungslogik isoliert testbar ist.

@@ -45,9 +45,9 @@ export async function POST(
     .map((s) => `Quelle: ${s.filename}\n${(chunksBySource.get(s.id) ?? []).join("\n")}`)
     .join("\n\n");
 
-  const mindMap = await generateMindMap(context);
+  const { text: mindMap, usedFallbackModel } = await generateMindMap(context);
 
   await supabase.from("notebooks").update({ mind_map: mindMap }).eq("id", notebookId);
 
-  return Response.json({ mindMap });
+  return Response.json({ mindMap, usedFallbackModel });
 }

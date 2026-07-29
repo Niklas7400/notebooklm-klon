@@ -4,6 +4,7 @@ import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { Citation, Message } from "@/lib/types";
 import { splitContentByCitations } from "@/lib/citations";
 import { parseFollowUpQuestions, stripFollowUpMarker } from "@/lib/followups";
+import { containsFallbackModelMarker, stripFallbackModelMarker, FALLBACK_MODEL_NOTICE } from "@/lib/modelFallback";
 
 function renderContent(
   content: string,
@@ -54,6 +55,7 @@ export function Chat({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
+  const [fallbackModelMessageIds, setFallbackModelMessageIds] = useState<Set<string>>(new Set());
   const messageIdCounter = useRef(0);
 
   function nextMessageId(prefix: string) {
@@ -131,13 +133,16 @@ export function Chat({
         // Streamende an -- bis dahin einfach den Text davor anzeigen, das
         // JSON wird erst nach done geparst (koennte sonst ueber mehrere
         // Chunks fragmentiert sein).
-        const displayContent = stripFollowUpMarker(raw);
+        const displayContent = stripFallbackModelMarker(stripFollowUpMarker(raw));
         setMessages((prev) =>
           prev.map((m) => (m.id === assistantId ? { ...m, content: displayContent } : m))
         );
       }
 
       setFollowUpQuestions(parseFollowUpQuestions(raw));
+      if (containsFallbackModelMarker(raw)) {
+        setFallbackModelMessageIds((prev) => new Set(prev).add(assistantId));
+      }
     } catch {
       setError("Netzwerkfehler beim Senden der Frage.");
     } finally {
@@ -172,7 +177,10 @@ export function Chat({
         ) : (
           <ul className="flex max-w-3xl flex-col gap-3.5">
             {messages.map((m) => (
-              <li key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+              <li
+                key={m.id}
+                className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}
+              >
                 <div
                   className={`max-w-[80%] whitespace-pre-wrap rounded-[14px] px-3.5 py-2.5 text-sm leading-[1.55] ${
                     m.role === "user"
@@ -182,6 +190,11 @@ export function Chat({
                 >
                   {renderContent(m.content, m.citations, onCitationClick)}
                 </div>
+                {fallbackModelMessageIds.has(m.id) && (
+                  <p className="m-0 mt-1 max-w-[80%] text-[11px] text-neutral-500">
+                    {FALLBACK_MODEL_NOTICE}
+                  </p>
+                )}
               </li>
             ))}
           </ul>

@@ -21,17 +21,22 @@ async function ensureAudioBucket(supabase: ReturnType<typeof createAdminClient>)
   }
 }
 
+type SynthesisResult = { buffer: Buffer | null; error: string | null };
+
 // Ein fehlgeschlagener TTS-Call darf den ganzen Flow nicht abbrechen -- einmal
 // erneut versuchen, sonst die Zeile ueberspringen (Skript behaelt die Zeile,
-// nur der Audio-Clip fehlt).
-async function synthesizeWithRetry(line: AudioScriptLine): Promise<Buffer | null> {
+// nur der Audio-Clip fehlt). Der konkrete Fehler wird trotzdem festgehalten
+// (statt ihn stillschweigend zu verwerfen), damit sich der Nutzer nicht mit
+// einer nichtssagenden Sammelmeldung wiederfindet, falls wirklich jede Zeile
+// scheitert -- z.B. weil das Google-TTS-Kontingent aufgebraucht ist.
+async function synthesizeWithRetry(line: AudioScriptLine): Promise<SynthesisResult> {
   try {
-    return await synthesizeSpeech(line.text, line.speaker);
+    return { buffer: await synthesizeSpeech(line.text, line.speaker), error: null };
   } catch {
     try {
-      return await synthesizeSpeech(line.text, line.speaker);
-    } catch {
-      return null;
+      return { buffer: await synthesizeSpeech(line.text, line.speaker), error: null };
+    } catch (err) {
+      return { buffer: null, error: err instanceof Error ? err.message : "Unbekannter TTS-Fehler." };
     }
   }
 }
@@ -112,15 +117,15 @@ export async function POST(
       ? `Zusammenfassung:\n${notebook.summary}\n\n${sourcesContext}`
       : sourcesContext;
 
-    const script = await generateAudioScript(context);
+    const { script, usedFallbackModel } = await generateAudioScript(context);
 
     // TTS-Calls in kleinen Batches statt rein sequenziell -- schneller, bleibt
     // aber innerhalb des Vercel-Timeouts (maxDuration 60s).
-    const buffers: (Buffer | null)[] = [];
+    const synthesisResults: SynthesisResult[] = [];
     for (let i = 0; i < script.length; i += TTS_CONCURRENCY) {
       const batch = script.slice(i, i + TTS_CONCURRENCY);
       const batchResults = await Promise.all(batch.map(synthesizeWithRetry));
-      buffers.push(...batchResults);
+      synthesisResults.push(...batchResults);
     }
 
     // Cache-Busting-Suffix fuer alle Clips dieser Generierung: der Storage-
@@ -132,10 +137,12 @@ export async function POST(
     // ueberhaupt neu angefragt wird.
     const generatedAt = Date.now();
     const clipUrls: (string | null)[] = [];
-    for (let i = 0; i < buffers.length; i++) {
-      const buffer = buffers[i];
+    const lineErrors: (string | null)[] = [];
+    for (let i = 0; i < synthesisResults.length; i++) {
+      const { buffer, error: synthError } = synthesisResults[i];
       if (!buffer) {
         clipUrls.push(null);
+        lineErrors.push(synthError);
         continue;
       }
       const path = `${notebookId}/${i}.mp3`;
@@ -145,22 +152,37 @@ export async function POST(
 
       if (uploadError) {
         clipUrls.push(null);
+        lineErrors.push(`Speichern fehlgeschlagen: ${uploadError.message}`);
         continue;
       }
       const { data: publicUrlData } = supabase.storage.from(AUDIO_BUCKET).getPublicUrl(path);
       clipUrls.push(`${publicUrlData.publicUrl}?v=${generatedAt}`);
+      lineErrors.push(null);
     }
 
     // audio_status nur dann 'failed', wenn wirklich nichts brauchbares
     // generiert wurde -- ein einzelner fehlgeschlagener Clip reicht nicht.
     const audioStatus = clipUrls.some((url) => url !== null) ? "ready" : "failed";
 
+    // Scheitern wirklich alle Zeilen, den konkreten Grund der ersten
+    // fehlgeschlagenen Zeile zeigen statt einer nichtssagenden
+    // Sammelmeldung -- sonst sieht die Ursache (z.B. Google-TTS-Kontingent
+    // aufgebraucht, Auth-Fehler) je nach Zufall der Zeilenreihenfolge immer
+    // gleich aus, obwohl sie es nicht ist.
+    const ttsError = audioStatus === "failed" ? lineErrors.find((e) => e) ?? null : null;
+
     await supabase
       .from("notebooks")
       .update({ audio_script: script, audio_clip_urls: clipUrls, audio_status: audioStatus })
       .eq("id", notebookId);
 
-    return Response.json({ script, clipUrls, audioStatus });
+    return Response.json({
+      script,
+      clipUrls,
+      audioStatus,
+      usedFallbackModel,
+      error: ttsError ? `Kein Audio-Clip konnte erzeugt werden (${ttsError})` : undefined,
+    });
   } catch (err) {
     await supabase.from("notebooks").update({ audio_status: "failed" }).eq("id", notebookId);
     const message = err instanceof Error ? err.message : "Unbekannter Fehler.";

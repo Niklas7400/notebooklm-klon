@@ -47,6 +47,7 @@ export function NotebookWorkspace({
   );
   const [summary, setSummary] = useState(notebook.summary);
   const [summarizing, setSummarizing] = useState(false);
+  const [summaryUsedFallbackModel, setSummaryUsedFallbackModel] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [chatResetKey, setChatResetKey] = useState(0);
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>(
@@ -101,6 +102,7 @@ export function NotebookWorkspace({
       if (res.ok) {
         const data = await res.json();
         setSummary(data.summary);
+        setSummaryUsedFallbackModel(Boolean(data.usedFallbackModel));
       }
     } finally {
       setSummarizing(false);
@@ -131,7 +133,10 @@ export function NotebookWorkspace({
       });
       if (viewingSource) setViewingSource(null);
       const body = await res.json().catch(() => null);
-      if (body && "summary" in body) setSummary(body.summary);
+      if (body && "summary" in body) {
+        setSummary(body.summary);
+        setSummaryUsedFallbackModel(Boolean(body.usedFallbackModel));
+      }
       router.refresh();
     }
   }
@@ -499,6 +504,7 @@ export function NotebookWorkspace({
           hasSources={sources.length > 0}
           summary={summary}
           summarizing={summarizing}
+          summaryUsedFallbackModel={summaryUsedFallbackModel}
           summaryOpen={summaryOpen}
           onToggleSummary={() => setSummaryOpen((open) => !open)}
           initialStudyGuide={notebook.study_guide}

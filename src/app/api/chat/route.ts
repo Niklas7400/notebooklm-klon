@@ -4,6 +4,7 @@ import { searchChunks } from "@/lib/retrieval";
 import { rewriteQuery, streamAnswerQuestion, generateFollowUpQuestions, type ChatMessage } from "@/lib/groq";
 import { buildSystemPrompt, buildCitations } from "@/lib/prompt";
 import { FOLLOWUP_MARKER } from "@/lib/followups";
+import { stripFallbackModelMarker } from "@/lib/modelFallback";
 import type { Citation } from "@/lib/types";
 
 // Chat/RAG-Flow (siehe CLAUDE.md): Guard -> Verlauf laden -> ggf. Query-Rewriting
@@ -104,9 +105,14 @@ export async function POST(request: Request) {
         // also erst nach Streamende generiert werden -- als letzter Chunk
         // hinter dem Marker angehaengt (siehe lib/followups.ts). Scheitert
         // dieser Zusatz-Call, wird die eigentliche Antwort davon nicht
-        // beeintraechtigt, es gibt dann einfach keine Folgefragen.
+        // beeintraechtigt, es gibt dann einfach keine Folgefragen. Der
+        // Fallback-Modell-Marker (falls vorhanden) gehoert nicht in den
+        // Kontext fuer diesen Call.
         try {
-          const followUps = await generateFollowUpQuestions(question, fullAnswer);
+          const followUps = await generateFollowUpQuestions(
+            question,
+            stripFallbackModelMarker(fullAnswer)
+          );
           if (followUps.length > 0) {
             controller.enqueue(encoder.encode(FOLLOWUP_MARKER + JSON.stringify(followUps)));
           }
@@ -120,10 +126,17 @@ export async function POST(request: Request) {
         controller.enqueue(encoder.encode(`\n\n[Fehler: ${message}]`));
       } finally {
         // Nachricht + aufgeloeste Zitate erst nach Streamende persistieren,
-        // sonst ist der Verlauf nach einem Reload halb leer.
+        // sonst ist der Verlauf nach einem Reload halb leer. Der Fallback-
+        // Modell-Marker ist nur ein UI-Hinweis fuer die laufende Session und
+        // soll nicht dauerhaft im gespeicherten Nachrichtentext landen.
         await supabase.from("messages").insert([
           { notebook_id: notebookId, role: "user", content: question },
-          { notebook_id: notebookId, role: "assistant", content: fullAnswer, citations },
+          {
+            notebook_id: notebookId,
+            role: "assistant",
+            content: stripFallbackModelMarker(fullAnswer),
+            citations,
+          },
         ]);
         controller.close();
       }

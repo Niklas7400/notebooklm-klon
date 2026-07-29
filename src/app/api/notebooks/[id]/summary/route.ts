@@ -22,6 +22,6 @@ export async function POST(
     return Response.json({ error: "Keine Quellen vorhanden." }, { status: 400 });
   }
 
-  const summary = await regenerateNotebookSummary(supabase, notebookId);
-  return Response.json({ summary });
+  const { summary, usedFallbackModel } = await regenerateNotebookSummary(supabase, notebookId);
+  return Response.json({ summary, usedFallbackModel });
 }

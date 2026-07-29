@@ -9,10 +9,12 @@ const CHUNKS_PER_SOURCE = 3;
 // widerspiegeln, nicht nur beim Hinzufuegen aktuell gehalten werden. Gibt es
 // keine Quellen mehr, wird die gespeicherte Zusammenfassung geloescht statt
 // veraltet stehen zu bleiben.
+export type SummaryResult = { summary: string | null; usedFallbackModel: boolean };
+
 export async function regenerateNotebookSummary(
   supabase: ReturnType<typeof createAdminClient>,
   notebookId: string
-): Promise<string | null> {
+): Promise<SummaryResult> {
   const { data: sources } = await supabase
     .from("sources")
     .select("id, filename")
@@ -20,7 +22,7 @@ export async function regenerateNotebookSummary(
 
   if (!sources || sources.length === 0) {
     await supabase.from("notebooks").update({ summary: null }).eq("id", notebookId);
-    return null;
+    return { summary: null, usedFallbackModel: false };
   }
 
   const sourceIds = sources.map((s) => s.id);
@@ -41,8 +43,8 @@ export async function regenerateNotebookSummary(
     .map((s) => `Quelle: ${s.filename}\n${(chunksBySource.get(s.id) ?? []).join("\n")}`)
     .join("\n\n");
 
-  const summary = await summarizeSources(context);
+  const { text: summary, usedFallbackModel } = await summarizeSources(context);
 
   await supabase.from("notebooks").update({ summary }).eq("id", notebookId);
-  return summary;
+  return { summary, usedFallbackModel };
 }

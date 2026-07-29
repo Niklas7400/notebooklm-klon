@@ -1,5 +1,7 @@
 "use client";
 
+import { FALLBACK_MODEL_NOTICE } from "@/lib/modelFallback";
+
 // Reine Anzeige-Komponente: die eigentliche Zusammenfassung wird automatisch
 // nach jedem Upload in NotebookWorkspace neu angefordert (siehe
 // handleUploaded dort) -- anders als Study Guide/Audio Overview gibt es hier
@@ -7,11 +9,13 @@
 export function Summary({
   summary,
   summarizing,
+  usedFallbackModel,
   open,
   onToggle,
 }: {
   summary: string | null;
   summarizing: boolean;
+  usedFallbackModel: boolean;
   open: boolean;
   onToggle: () => void;
 }) {
@@ -54,6 +58,9 @@ export function Summary({
       </button>
 
       {summarizing && <p className="mt-1 mb-0 text-[10px] text-neutral-500">wird aktualisiert…</p>}
+      {!summarizing && usedFallbackModel && (
+        <p className="mt-1 mb-0 text-[10px] text-neutral-500">{FALLBACK_MODEL_NOTICE}</p>
+      )}
 
       {open &&
         (summary ? (

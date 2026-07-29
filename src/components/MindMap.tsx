@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Transformer } from "markmap-lib";
 import { Markmap } from "markmap-view";
 import { Dialog } from "@/components/Dialog";
+import { FALLBACK_MODEL_NOTICE } from "@/lib/modelFallback";
 
 // Leerer Plugin-Satz: die eingebauten markmap-lib-Plugins (KaTeX, Highlight.js,
 // Checkboxen, ...) ziehen zusaetzliche Abhaengigkeiten nach sich, die fuer
@@ -57,10 +58,12 @@ export function MindMap({
   const [fullscreen, setFullscreen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [usedFallbackModel, setUsedFallbackModel] = useState(false);
 
   async function handleGenerate() {
     setLoading(true);
     setError(null);
+    setUsedFallbackModel(false);
     setOpen(true);
     try {
       const res = await fetch(`/api/notebooks/${notebookId}/mind-map`, { method: "POST" });
@@ -70,6 +73,7 @@ export function MindMap({
         return;
       }
       setMarkdown(body.mindMap);
+      setUsedFallbackModel(Boolean(body.usedFallbackModel));
     } catch {
       setError("Netzwerkfehler bei der Generierung.");
     } finally {
@@ -133,6 +137,9 @@ export function MindMap({
             <p className="m-0 text-xs text-neutral-500">Erst eine Quelle hochladen.</p>
           )}
           {error && <p className="m-0 text-xs text-danger">{error}</p>}
+          {usedFallbackModel && (
+            <p className="m-0 mb-1.5 text-xs text-neutral-500">{FALLBACK_MODEL_NOTICE}</p>
+          )}
           {!error && hasSources && !markdown && (
             <p className="m-0 text-xs text-neutral-500">Noch keine Mind Map generiert.</p>
           )}

@@ -1,5 +1,69 @@
-import { describe, expect, it } from "vitest";
-import { parseAudioScript, stripMarkdownCodeFence } from "./groq";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { parseAudioScript, rewriteQuery, stripMarkdownCodeFence, summarizeSources } from "./groq";
+
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), { status });
+}
+
+function groqSuccessBody(content: string) {
+  return { choices: [{ message: { content } }] };
+}
+
+function groqRateLimitBody() {
+  return {
+    error: {
+      message:
+        "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_test` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 99640, Requested 3297. Please try again in 42m17.568s.",
+      type: "tokens",
+      code: "rate_limit_exceeded",
+    },
+  };
+}
+
+describe("Fallback-Modell bei Groq-Tageslimit", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("faellt bei einem 429 des Hauptmodells automatisch auf das Ausweichmodell zurueck", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(429, groqRateLimitBody()))
+      .mockResolvedValueOnce(jsonResponse(200, groqSuccessBody("Zusammenfassung vom Ausweichmodell")));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await summarizeSources("Quellenkontext");
+
+    expect(result).toEqual({
+      text: "Zusammenfassung vom Ausweichmodell",
+      usedFallbackModel: true,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const secondCallBody = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(secondCallBody.model).toBe("llama-3.1-8b-instant");
+  });
+
+  it("nutzt das Hauptmodell direkt, wenn es nicht rate-limitiert ist", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, groqSuccessBody("Normale Zusammenfassung")));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await summarizeSources("Quellenkontext");
+
+    expect(result).toEqual({ text: "Normale Zusammenfassung", usedFallbackModel: false });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("wirft bei einem Nicht-Rate-Limit-Fehler die eigentliche Groq-Fehlermeldung, nicht den rohen JSON-Body", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      jsonResponse(401, { error: { message: "Invalid API Key", type: "invalid_request_error" } })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(rewriteQuery("Frage", [])).rejects.toThrow("Invalid API Key");
+  });
+});
 
 describe("parseAudioScript", () => {
   it("parst ein sauberes JSON-Array", () => {
