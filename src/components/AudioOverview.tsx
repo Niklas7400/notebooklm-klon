@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AudioScriptLine, AudioStatus } from "@/lib/types";
 
 // Sequenzielle Wiedergabe der TTS-Clips -- kein serverseitiges
@@ -12,6 +12,11 @@ function firstPlayableIndex(clipUrls: (string | null)[], from: number): number {
   }
   return -1;
 }
+
+// Kurze Pause zwischen Sprecherwechseln, damit es wie ein echtes Gespraech
+// klingt statt wie ohne Luft aneinandergereihte Saetze (Clips liefen vorher
+// nahtlos ineinander, weil der naechste sofort im onEnded-Handler startete).
+const TURN_PAUSE_MS = 500;
 
 export function AudioOverview({
   notebookId,
@@ -35,6 +40,14 @@ export function AudioOverview({
   const [isPlaying, setIsPlaying] = useState(false);
   const [sectionOpen, setSectionOpen] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const pauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
+    },
+    []
+  );
 
   async function handleGenerate() {
     setGenerating(true);
@@ -77,6 +90,13 @@ export function AudioOverview({
   function handlePlayPause() {
     if (!clipUrls) return;
     if (isPlaying) {
+      // Falls gerade die Pause zwischen zwei Zeilen laeuft (Timer noch nicht
+      // gefeuert): abbrechen, sonst wuerde die Wiedergabe trotz Pause-Klick
+      // gleich von selbst weiterlaufen.
+      if (pauseTimerRef.current) {
+        clearTimeout(pauseTimerRef.current);
+        pauseTimerRef.current = null;
+      }
       audioRef.current?.pause();
       setIsPlaying(false);
       return;
@@ -94,7 +114,10 @@ export function AudioOverview({
       setCurrentIndex(-1);
       return;
     }
-    playFrom(next);
+    pauseTimerRef.current = setTimeout(() => {
+      pauseTimerRef.current = null;
+      playFrom(next);
+    }, TURN_PAUSE_MS);
   }
 
   return (
