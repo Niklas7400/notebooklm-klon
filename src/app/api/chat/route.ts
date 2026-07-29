@@ -84,7 +84,7 @@ export async function POST(request: Request) {
   const searchQuery = history.length > 0 ? await rewriteQuery(question, history) : question;
 
   const queryEmbedding = await embedQuery(searchQuery);
-  const results = await searchChunks(notebookId, queryEmbedding, sourceIds);
+  const results = await searchChunks(notebookId, searchQuery, queryEmbedding, sourceIds);
 
   const systemPrompt = buildSystemPrompt(results);
   const citations = buildCitations(results);

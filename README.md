@@ -6,7 +6,7 @@ Ein funktionierender Klon von [NotebookLM](https://notebooklm.google.com), gebau
 
 1. Notebooks anlegen und löschen
 2. Quellen hochladen: PDF, eingefügter Text, **URL** (Fetch + HTML-Text-Extraktion)
-3. Quellen werden automatisch in Chunks zerlegt, embedded und in einer Vektordatenbank durchsuchbar gemacht
+3. Quellen werden automatisch in Chunks zerlegt, embedded und in einer Vektordatenbank durchsuchbar gemacht; ein nachgeschaltetes Cross-Encoder-Reranking verdichtet einen breiteren Kandidaten-Pool auf die relevantesten Treffer für den Prompt (skaliert unabhängig von der Notebook-Größe, siehe Architektur)
 4. Chat mit **Streaming-Antworten**, die auf konkrete Quellstellen verweisen (klickbare Zitat-Nummern im Text zeigen den referenzierten Ausschnitt in der Sidebar); nach jeder Antwort werden 2–3 passende Folgefragen vorgeschlagen
 5. Bei jedem Upload wird automatisch eine aktuelle Zusammenfassung ("Notebook Guide") erzeugt und persistent gespeichert — einklappbar in der Sidebar
 6. Quellen-Auswahl per Checkbox (nur ausgewählte Quellen befragen)
@@ -16,7 +16,9 @@ Ein funktionierender Klon von [NotebookLM](https://notebooklm.google.com), gebau
 
 ## Architektur
 
-Next.js (App Router) als Frontend und API-Layer in einem, Supabase/Postgres mit `pgvector` als Vektordatenbank, Voyage AI für Embeddings und Groq (Llama 3.3 70B, OpenAI-kompatible API) als Chat-LLM. Alle DB-Zugriffe laufen serverseitig über den Supabase Service-Role-Key; der Anon-Key wird im Client-Bundle nie für Datenzugriffe verwendet. Der RAG-Flow ist klassisch zweiphasig: Ingestion (Text extrahieren → chunken → embedden → speichern) und Retrieval (Frage embedden → Ähnlichkeitssuche via `match_chunks`-RPC → Antwort mit lokal nummerierten Zitaten, die serverseitig auf echte Chunk-IDs zurückgemappt werden).
+Next.js (App Router) als Frontend und API-Layer in einem, Supabase/Postgres mit `pgvector` als Vektordatenbank, Voyage AI für Embeddings und Reranking und Groq (Llama 3.3 70B, OpenAI-kompatible API) als Chat-LLM. Alle DB-Zugriffe laufen serverseitig über den Supabase Service-Role-Key; der Anon-Key wird im Client-Bundle nie für Datenzugriffe verwendet. Der RAG-Flow ist klassisch zweiphasig: Ingestion (Text extrahieren → chunken → embedden → speichern) und Retrieval (Frage embedden → Ähnlichkeitssuche via `match_chunks`-RPC liefert einen breiteren Kandidaten-Pool → Cross-Encoder-Reranking verdichtet auf die finalen Treffer → Antwort mit lokal nummerierten Zitaten, die serverseitig auf echte Chunk-IDs zurückgemappt werden).
+
+**Reranking im Detail:** Die reine Vektorsuche (`match_chunks`) liefert zunächst 30 statt der finalen 8 Kandidaten. Diese gehen zusammen mit der Frage an Voyage AIs `rerank-2-lite` (Cross-Encoder: bewertet Frage und Chunk-Text gemeinsam statt wie beim Embedding nur über die Distanz zweier unabhängig berechneter Vektoren), das die 8 tatsächlich relevantesten Treffer für den Prompt auswählt. Das lohnt sich vor allem bei großen Notebooks mit vielen thematisch ähnlichen Chunks, wo reine Kosinus-Distanz oft mehrere ähnlich nahe, aber unterschiedlich relevante Treffer liefert. Skaliert dabei unabhängig von der Notebook-Größe: der HNSW-Index liefert die 30 Kandidaten in O(log n) egal ob ein Notebook 50 oder 50.000 Chunks enthält, und das Reranking bewertet danach immer nur diesen konstanten Pool statt des gesamten Chunk-Bestands. Bei kleinen Kandidaten-Mengen (≤ 8 Treffer) entfällt der Rerank-Call ganz; schlägt er fehl (Rate-Limit, Netzwerk), fällt die Suche auf die reine Vektorsuche-Reihenfolge zurück, statt die Chat-Antwort scheitern zu lassen.
 
 ## Tech-Stack
 
@@ -25,7 +27,7 @@ Next.js (App Router) als Frontend und API-Layer in einem, Supabase/Postgres mit 
 | Framework | Next.js (App Router) + TypeScript + Tailwind CSS | Vorgabe |
 | PDF-Parsing | [`unpdf`](https://github.com/unjs/unpdf) | Läuft ohne native Abhängigkeiten in Vercel Serverless Functions |
 | Chunking | LangChain.js `RecursiveCharacterTextSplitter` | ~1800 Zeichen/Chunk (≈500 Tokens), 200 Zeichen Overlap |
-| Embeddings | Voyage AI, `voyage-4-lite` | 200 Mio. Freitokens/Account, hohes Batch-Limit (1M Tokens/Request) |
+| Embeddings & Reranking | Voyage AI, `voyage-4-lite` (Embeddings) + `rerank-2-lite` (Reranking) | 200 Mio. Freitokens/Account, hohes Batch-Limit (1M Tokens/Request); gleicher Account/Key für beide Modelle |
 | Vektor-Speicher | Supabase (Postgres + `pgvector`) | REST-basierter JS-Client statt direkter Postgres-Connection (Connection-Limits in Serverless Functions) |
 | Chat-LLM | Groq, `llama-3.3-70b-versatile` (Chat/Zusammenfassung), `llama-3.1-8b-instant` (Query-Rewriting) | Echter Free-Tier ohne Kreditkarte, keine EU-Einschränkung |
 | Text-to-Speech | Google Cloud TTS (WaveNet), Stimmen `de-DE-Wavenet-F` / `de-DE-Wavenet-B` | ~1 Mio. Freizeichen/Monat, zwei unterschiedliche Stimmen für die zwei Podcast-Hosts |
@@ -83,8 +85,7 @@ Alle Punkte aus MVP, den Tag-5-Erweiterungen, Streaming (Tag 6) und Audio Overvi
 ## Bekannte Grenzen
 
 - **Kein OCR**: Gescannte PDFs ohne Text-Layer liefern leeren Text und werden mit einer klaren Fehlermeldung abgelehnt, statt sie stillschweigend als leere Quelle zu speichern.
-- **Kein Reranking**: Die Ähnlichkeitssuche liefert die Top-K-Treffer nach Kosinus-Distanz direkt an das LLM weiter, ohne einen zweiten, genaueren Relevanz-Schritt. Nächster naheliegender Qualitätsschritt, wurde für dieses Projekt aber bewusst nicht gebaut.
-- **Keine Hybrid-Suche**: Nur Vektorsuche, keine Kombination mit klassischer Stichwortsuche (BM25 o.ä.) — bei sehr spezifischen Eigennamen/Zahlen kann das reine Embedding-Matching schwächer sein.
+- **Keine Hybrid-Suche**: Nur Vektorsuche (plus Reranking, siehe Architektur), keine Kombination mit klassischer Stichwortsuche (BM25 o.ä.) — bei sehr spezifischen Eigennamen/Zahlen kann das reine Embedding-Matching schwächer sein. Nächster naheliegender Qualitätsschritt, wurde für dieses Projekt aber bewusst nicht gebaut.
 - **Keine Mandantentrennung**: Alle Notebooks liegen in derselben Tabelle ohne User-Scoping — passend zum Deployment als einzelner Demo-Zugang, nicht für Mehrbenutzerbetrieb gedacht.
 - **HTML-Extraktion bei URL-Quellen** ist eine einfache, Regex-basierte Bereinigung (kein Readability-Algorithmus) — bei Seiten mit viel Navigations-/Boilerplate-Text landet dieser mit im extrahierten Text.
 - **Open-Source-LLM-Grenzen**: Llama hält sich bei strikten Format-/Verhaltensvorgaben (Zitat-Format, "nur aus den Quellen antworten") in der Praxis etwas weniger zuverlässig an Vorgaben als z. B. Claude — siehe `NOTES.md` für konkret beobachtete Fälle und mögliche Prompt-Verbesserungen.
