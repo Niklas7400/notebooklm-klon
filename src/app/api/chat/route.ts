@@ -5,6 +5,7 @@ import { rewriteQuery, streamAnswerQuestion, generateFollowUpQuestions, type Cha
 import { buildSystemPrompt, buildCitations } from "@/lib/prompt";
 import { FOLLOWUP_MARKER } from "@/lib/followups";
 import { stripFallbackModelMarker } from "@/lib/modelFallback";
+import { hasCitation } from "@/lib/citations";
 import type { Citation } from "@/lib/types";
 
 // Chat/RAG-Flow (siehe CLAUDE.md): Guard -> Verlauf laden -> ggf. Query-Rewriting
@@ -108,16 +109,20 @@ export async function POST(request: Request) {
         // beeintraechtigt, es gibt dann einfach keine Folgefragen. Der
         // Fallback-Modell-Marker (falls vorhanden) gehoert nicht in den
         // Kontext fuer diesen Call.
-        try {
-          const followUps = await generateFollowUpQuestions(
-            question,
-            stripFallbackModelMarker(fullAnswer)
-          );
-          if (followUps.length > 0) {
-            controller.enqueue(encoder.encode(FOLLOWUP_MARKER + JSON.stringify(followUps)));
+        const answerText = stripFallbackModelMarker(fullAnswer);
+        // Eine Antwort ganz ohne Zitat ist praktisch immer eine Ablehnung
+        // ("dazu steht nichts in den Quellen") -- direkt danach weitere
+        // Fragen vorzuschlagen fuehrt nur in die naechste Sackgasse.
+        if (hasCitation(answerText)) {
+          try {
+            const sourceContext = results.map((r) => r.content).join("\n\n");
+            const followUps = await generateFollowUpQuestions(question, answerText, sourceContext);
+            if (followUps.length > 0) {
+              controller.enqueue(encoder.encode(FOLLOWUP_MARKER + JSON.stringify(followUps)));
+            }
+          } catch {
+            // Nice-to-have, kein Fehlerfall fuer den Nutzer.
           }
-        } catch {
-          // Nice-to-have, kein Fehlerfall fuer den Nutzer.
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unbekannter Fehler beim Streaming.";

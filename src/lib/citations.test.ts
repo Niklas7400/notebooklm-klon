@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { splitContentByCitations } from "./citations";
+import { hasCitation, splitContentByCitations } from "./citations";
 
 describe("splitContentByCitations", () => {
   it("erkennt das Standardformat [chunk:N]", () => {
@@ -27,5 +27,24 @@ describe("splitContentByCitations", () => {
   it("gibt Text ohne Zitate unveraendert als einzelnes Segment zurueck", () => {
     const segments = splitContentByCitations("Kein Zitat hier.");
     expect(segments).toEqual([{ type: "text", value: "Kein Zitat hier." }]);
+  });
+});
+
+describe("hasCitation", () => {
+  it("erkennt eine Antwort mit Standard-Zitat", () => {
+    expect(hasCitation("Der Eiffelturm ist hoch [chunk:1].")).toBe(true);
+  });
+
+  it("erkennt eine Antwort mit tolerantem Zitat-Format ohne Klammern", () => {
+    expect(hasCitation("Aussage chunk:2 mit Beleg.")).toBe(true);
+  });
+
+  it("erkennt eine Ablehnungsantwort ohne jedes Zitat als negativ", () => {
+    expect(hasCitation("Dazu enthalten die Quellen keine Informationen.")).toBe(false);
+  });
+
+  it("mutiert nicht den lastIndex der geteilten CITATION_REGEX-Konstante (mehrfacher Aufruf bleibt konsistent)", () => {
+    expect(hasCitation("Text mit [chunk:1].")).toBe(true);
+    expect(hasCitation("Text mit [chunk:1].")).toBe(true);
   });
 });

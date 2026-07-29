@@ -26,3 +26,14 @@ export function splitContentByCitations(content: string): ContentSegment[] {
   }
   return segments;
 }
+
+// Eine Antwort ohne jedes [chunk:N]-Zitat ist praktisch immer eine Ablehnung
+// ("dazu steht nichts in den Quellen") statt einer inhaltlichen Antwort --
+// der System-Prompt verlangt sonst ein Zitat pro Aussage. Dient als
+// guenstiger Filter, um in diesem Fall keine Folgefragen vorzuschlagen
+// (siehe chat/route.ts). Eigene RegExp-Instanz statt der geteilten
+// CITATION_REGEX-Konstante, da .test() sonst deren lastIndex veraendern
+// wuerde (gleiche Vorsichtsmassnahme wie im Loop oben).
+export function hasCitation(content: string): boolean {
+  return new RegExp(CITATION_REGEX).test(content);
+}

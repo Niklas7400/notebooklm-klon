@@ -197,11 +197,20 @@ ${context}`;
 // Folgefragen nach jeder Chat-Antwort (Nutzerwunsch, nicht in CLAUDE.md
 // vorgegeben): gleiches leichtes Modell wie beim Query-Rewriting, damit der
 // Zusatz-Call die eigentliche (gestreamte) Antwort nicht spuerbar verzoegert.
+// Bekommt zusaetzlich zum Frage-Antwort-Austausch die tatsaechlich gefundenen
+// Quellenausschnitte -- sonst assoziiert das Modell frei anhand des reinen
+// Antworttexts und schlaegt Folgefragen zu Themen vor, die die Quelle gar
+// nicht abdeckt (beobachtet: Nutzer klickt eine plausibel klingende, aber
+// unbeantwortbare Folgefrage an, Antwort ist eine Ablehnung).
 export async function generateFollowUpQuestions(
   question: string,
-  answer: string
+  answer: string,
+  sourceContext: string
 ): Promise<string[]> {
-  const prompt = `Basierend auf diesem Frage-Antwort-Austausch: schlage genau 2-3 kurze, natuerliche Folgefragen vor, die der Nutzer als naechstes stellen koennte. Eine Frage pro Zeile, ohne Nummerierung, ohne Aufzaehlungszeichen, ohne Einleitung oder Erklaerung. Antworte in der Sprache des Austauschs.
+  const prompt = `Basierend auf diesem Frage-Antwort-Austausch und den folgenden Quellenausschnitten: schlage genau 2-3 kurze, natuerliche Folgefragen vor, die der Nutzer als naechstes stellen koennte. Wichtig: Nur Fragen vorschlagen, die sich anhand der Quellenausschnitte tatsaechlich beantworten lassen -- keine Fragen zu Themen, die darin nicht vorkommen. Eine Frage pro Zeile, ohne Nummerierung, ohne Aufzaehlungszeichen, ohne Einleitung oder Erklaerung. Antworte in der Sprache des Austauschs.
+
+Quellenausschnitte:
+${sourceContext}
 
 Frage: ${question}
 Antwort: ${answer}`;
