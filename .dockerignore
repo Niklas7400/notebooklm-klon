@@ -1,0 +1,10 @@
+node_modules
+.next
+.git
+.env.local
+tmp-audio-test
+npm-debug.log*
+NOTES.md
+*.md
+!README.md
+coverage

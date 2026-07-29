@@ -45,6 +45,15 @@ npm run dev
 
 Supabase-Schema einmalig im SQL-Editor ausführen: [`supabase/schema.sql`](supabase/schema.sql) (Tabellen, RLS, HNSW-Index, `match_chunks`-Funktion). Der Storage-Bucket `audio-clips` für Audio-Overview-Clips wird beim ersten Generieren automatisch (public) angelegt, kein manueller Schritt nötig.
 
+### Alternative: mit Docker starten
+
+```bash
+cp .env.example .env.local   # Werte eintragen, siehe unten
+docker compose up --build
+```
+
+App läuft danach unter `http://localhost:3000`. Das Supabase-Schema (siehe oben) muss trotzdem einmalig im SQL-Editor ausgeführt werden — Supabase läuft als gehosteter Cloud-Dienst, nicht als Container in diesem Setup, es gibt also keine lokale Datenbank zum Anlegen. `docker-compose.yml` reicht `.env.local` per `env_file` in den Container durch; alle Variablen sind reiner Server-Runtime-Zugriff (siehe Kommentar in `src/lib/supabase/admin.ts` und "Must-Have"-Punkt zu RLS oben) — auch die `NEXT_PUBLIC_*`-Variablen werden aktuell nirgends im Client-Bundle gelesen, deshalb reichen sie zur Laufzeit und müssen nicht als Docker-Build-Arg übergeben werden. Das mehrstufige `Dockerfile` baut auf Next.js' `output: "standalone"` auf (schlankes Server-Bundle statt vollem `node_modules`-Baum).
+
 ### Environment Variables
 
 ```
