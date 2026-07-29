@@ -106,6 +106,18 @@ export function AudioOverview({
     playFrom(startIndex);
   }
 
+  function handleLineClick(index: number) {
+    if (!clipUrls || !clipUrls[index]) return;
+    // Falls gerade die Pause zwischen zwei Zeilen laeuft: abbrechen, sonst
+    // wuerde kurz nach dem Sprung zusaetzlich noch der alte, laengst
+    // ueberholte "naechste Zeile"-Timer feuern.
+    if (pauseTimerRef.current) {
+      clearTimeout(pauseTimerRef.current);
+      pauseTimerRef.current = null;
+    }
+    playFrom(index);
+  }
+
   function handleEnded() {
     if (!clipUrls) return;
     const next = firstPlayableIndex(clipUrls, currentIndex + 1);
@@ -214,10 +226,18 @@ export function AudioOverview({
               </button>
               <div className="flex max-h-[32rem] flex-col gap-1 overflow-y-auto">
                 {script.map((line, i) => (
-                  <div
+                  <button
                     key={i}
-                    className={`rounded-sm px-2 py-1.5 text-xs ${
-                      i === currentIndex ? "bg-accent-800" : "bg-transparent"
+                    type="button"
+                    onClick={() => handleLineClick(i)}
+                    disabled={!clipUrls[i]}
+                    title={clipUrls[i] ? "Von hier abspielen" : undefined}
+                    className={`w-full rounded-sm border-0 px-2 py-1.5 text-left text-xs ${
+                      i === currentIndex
+                        ? "bg-accent-800"
+                        : clipUrls[i]
+                          ? "cursor-pointer bg-transparent hover:bg-white/5"
+                          : "cursor-not-allowed bg-transparent opacity-60"
                     }`}
                   >
                     <span className="font-medium text-accent-300">
@@ -227,7 +247,7 @@ export function AudioOverview({
                     {!clipUrls[i] && (
                       <span className="ml-1 text-neutral-500">(Audio nicht verfügbar)</span>
                     )}
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
