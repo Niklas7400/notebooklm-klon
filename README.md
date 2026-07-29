@@ -4,16 +4,17 @@ Ein funktionierender Klon von [NotebookLM](https://notebooklm.google.com), gebau
 
 ## Was die App kann
 
-1. Notebooks anlegen und löschen
-2. Quellen hochladen: PDF, eingefügter Text, **URL** (Fetch + HTML-Text-Extraktion); Quellen einzeln wieder löschen, linke Quellen-Sidebar einklappbar
+1. Mehrere Notebooks parallel verwalten: anlegen, umbenennen, löschen; Übersichtsseite mit Suchfeld
+2. Quellen hochladen: PDF, eingefügter Text, **URL** (Fetch + HTML-Text-Extraktion); Quellen einzeln wieder löschen, Klick auf eine Quelle zeigt ihren extrahierten Volltext, linke Quellen-Sidebar einklappbar
 3. Quellen werden automatisch in Chunks zerlegt, embedded und in einer Vektordatenbank durchsuchbar gemacht; ein nachgeschaltetes Cross-Encoder-Reranking verdichtet einen breiteren Kandidaten-Pool auf die relevantesten Treffer für den Prompt (skaliert unabhängig von der Notebook-Größe, siehe Architektur)
-4. Chat mit **Streaming-Antworten**, die auf konkrete Quellstellen verweisen: klickbare Zitat-Nummern im Text zeigen den referenzierten Ausschnitt unten im Chat *und* klappen die zugehörige Quelle links auf, mit farblich hervorgehobener zitierter Stelle im Volltext; nach jeder Antwort werden 2–3 passende, an den tatsächlichen Quellenausschnitten verankerte Folgefragen vorgeschlagen
+4. Chat mit **Streaming-Antworten**, die auf konkrete Quellstellen verweisen: klickbare Zitat-Nummern im Text zeigen den referenzierten Ausschnitt unten im Chat *und* klappen die zugehörige Quelle links auf, mit farblich hervorgehobener zitierter Stelle im Volltext; nach jeder Antwort werden 2–3 passende, an den tatsächlichen Quellenausschnitten verankerte Folgefragen vorgeschlagen. In einem noch leeren Chat stehen stattdessen automatisch generierte Einstiegsfragen zu den hochgeladenen Quellen bereit
 5. Bei jedem Upload — und nach jedem Löschen einer Quelle — wird automatisch eine aktuelle Zusammenfassung ("Notebook Guide") erzeugt und persistent gespeichert — einklappbar in der Sidebar
 6. Quellen-Auswahl per Checkbox (nur ausgewählte Quellen befragen)
 7. Chatverlauf bleibt nach einem Reload erhalten, Chat lässt sich zurücksetzen
 8. Ein vorbefülltes Demo-Notebook ist beim Öffnen des Live-Links sofort verfügbar
 9. **Audio Overview**: auf Knopfdruck ein Zwei-Stimmen-Podcast-Gespräch über die Notebook-Inhalte generieren (Groq für das Skript, Google Cloud TTS für die Sprachausgabe, sequenzielle Wiedergabe im Player)
 10. **Mind Map**: auf Knopfdruck eine interaktive, zoom-/pannbare Mind Map der Notebook-Inhalte generieren (Groq für die Markdown-Gliederung, [Markmap](https://markmap.js.org/) fürs Rendering im Browser), mit Vorschau in der Sidebar und Vollbild-Ansicht
+11. **Study Guide**: auf Knopfdruck eine Lernhilfe aus den Quellen generieren — Kernkonzepte als Stichpunkte plus 4–6 Frage-Antwort-Paare zu typischen Verständnisfragen; wie Mind Map und Audio Overview persistent gespeichert
 
 ## Architektur
 
@@ -27,7 +28,7 @@ Next.js (App Router) als Frontend und API-Layer in einem, Supabase/Postgres mit 
 |---|---|---|
 | Framework | Next.js (App Router) + TypeScript + Tailwind CSS | Vorgabe |
 | PDF-Parsing | [`unpdf`](https://github.com/unjs/unpdf) | Läuft ohne native Abhängigkeiten in Vercel Serverless Functions |
-| Chunking | LangChain.js `RecursiveCharacterTextSplitter` | ~1800 Zeichen/Chunk (≈500 Tokens), 200 Zeichen Overlap |
+| Chunking | LangChain.js `RecursiveCharacterTextSplitter` | 900 Zeichen/Chunk, 150 Zeichen Overlap (~17%). Bewusst kleiner als die ursprünglich geplanten ~1800 Zeichen (≈500 Tokens): Beim Test mit einem echten 24-seitigen PDF enthielt ein 1800-Zeichen-Chunk oft mehrere thematisch verschiedene Punkte, sodass der angezeigte Zitat-Ausschnitt deutlich mehr Kontext zeigte als für die belegte Aussage nötig |
 | Embeddings & Reranking | Voyage AI, `voyage-4-lite` (Embeddings) + `rerank-2-lite` (Reranking) | 200 Mio. Freitokens/Account, hohes Batch-Limit (1M Tokens/Request); gleicher Account/Key für beide Modelle |
 | Vektor-Speicher | Supabase (Postgres + `pgvector`) | REST-basierter JS-Client statt direkter Postgres-Connection (Connection-Limits in Serverless Functions) |
 | Chat-LLM | Groq, `llama-3.3-70b-versatile` (Chat/Zusammenfassung), `llama-3.1-8b-instant` (Query-Rewriting) | Echter Free-Tier ohne Kreditkarte, keine EU-Einschränkung; automatischer Fallback auf `llama-3.1-8b-instant`, falls das Tageslimit von `llama-3.3-70b-versatile` erreicht ist (mit Hinweis im UI) |
@@ -52,7 +53,7 @@ cp .env.example .env.local   # Werte eintragen, siehe unten
 docker compose up --build
 ```
 
-App läuft danach unter `http://localhost:3000`. Das Supabase-Schema (siehe oben) muss trotzdem einmalig im SQL-Editor ausgeführt werden — Supabase läuft als gehosteter Cloud-Dienst, nicht als Container in diesem Setup, es gibt also keine lokale Datenbank zum Anlegen. `docker-compose.yml` reicht `.env.local` per `env_file` in den Container durch; alle Variablen sind reiner Server-Runtime-Zugriff (siehe Kommentar in `src/lib/supabase/admin.ts` und "Must-Have"-Punkt zu RLS oben) — auch die `NEXT_PUBLIC_*`-Variablen werden aktuell nirgends im Client-Bundle gelesen, deshalb reichen sie zur Laufzeit und müssen nicht als Docker-Build-Arg übergeben werden. Das mehrstufige `Dockerfile` baut auf Next.js' `output: "standalone"` auf (schlankes Server-Bundle statt vollem `node_modules`-Baum).
+App läuft danach unter `http://localhost:3000`. Das Supabase-Schema (siehe oben) muss trotzdem einmalig im SQL-Editor ausgeführt werden — Supabase läuft als gehosteter Cloud-Dienst, nicht als Container in diesem Setup, es gibt also keine lokale Datenbank zum Anlegen. `docker-compose.yml` reicht `.env.local` per `env_file` in den Container durch; alle Variablen sind reiner Server-Runtime-Zugriff (siehe `src/lib/supabase/admin.ts` und den Abschnitt "Datenmodell" unten) — auch die `NEXT_PUBLIC_*`-Variablen werden aktuell nirgends im Client-Bundle gelesen, deshalb reichen sie zur Laufzeit und müssen nicht als Docker-Build-Arg übergeben werden. Das mehrstufige `Dockerfile` baut auf Next.js' `output: "standalone"` auf (schlankes Server-Bundle statt vollem `node_modules`-Baum).
 
 ### Environment Variables
 
@@ -61,7 +62,7 @@ GROQ_API_KEY=                    # console.groq.com
 VOYAGE_API_KEY=                  # dash.voyageai.com — Zahlungsmethode hinterlegen, sonst nur 3 RPM/10K TPM
 GOOGLE_CLOUD_TTS_API_KEY=        # console.cloud.google.com (Audio Overview)
 NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=  # der Vollständigkeit halber — im Code bewusst nirgends verwendet, siehe Architektur
 SUPABASE_SERVICE_ROLE_KEY=
 SITE_PASSWORD=                   # Middleware-Passwort-Gate, leer lassen = kein Schutz
 ```
@@ -72,7 +73,7 @@ SITE_PASSWORD=                   # Middleware-Passwort-Gate, leer lassen = kein 
 npm test
 ```
 
-64 Unit-Tests über 8 Dateien für die reine, von externen APIs unabhängige Logik: Chunker, Zitat-Parser, Leertext-Validierung, HTML-Extraktion für URL-Quellen, RAG-Prompt-/Zitat-Aufbau, relative Datumsanzeige, das Parsen der Audio-Overview-Skript-Antwort, das Entfernen von Codeblock-Wrappern aus der Mind-Map-Markdown-Antwort, das Abtrennen der Folgefragen vom Chat-Antwort-Stream, das Entfernen von Steuerzeichen aus PDF-Text und die Groq-Fallback-Modell-Logik (mit gemocktem `fetch`, ohne echten Netzwerk-Call) — die Stellen, an denen sich Formatannahmen am leichtesten stillschweigend brechen lassen. Funktionen mit echten API-Calls (Groq, Voyage, Google TTS, Supabase) sind ansonsten bewusst nicht unit-getestet, sondern manuell gegen die echte Umgebung verifiziert (siehe Commit-Historie).
+73 Unit-Tests über 8 Dateien für die reine, von externen APIs unabhängige Logik: Chunker, Zitat-Parser, Leertext-Validierung, HTML-Extraktion für URL-Quellen, RAG-Prompt-/Zitat-Aufbau, relative Datumsanzeige, das Parsen der Audio-Overview-Skript-Antwort, das Entfernen von Codeblock-Wrappern aus der Mind-Map-Markdown-Antwort, das Abtrennen der Folgefragen vom Chat-Antwort-Stream, das Entfernen von Steuerzeichen aus PDF-Text und die Groq-Fallback-Modell-Logik (mit gemocktem `fetch`, ohne echten Netzwerk-Call) — die Stellen, an denen sich Formatannahmen am leichtesten stillschweigend brechen lassen. Den größten Block stellt dabei das Audio-Skript-Parsing: Das schwächere Fallback-Modell hält das geforderte JSON-Format nicht zuverlässig ein (mehrere separate Arrays statt einem, fehlende äußere Klammern, Wrapper-Objekt, Trailing-Komma, abgeschnittene Antwort) — jeder dieser Fälle wurde live beobachtet oder in einem Review konstruiert und ist als Regressionstest festgehalten. Funktionen mit echten API-Calls (Groq, Voyage, Google TTS, Supabase) sind ansonsten bewusst nicht unit-getestet, sondern manuell gegen die echte Umgebung verifiziert (siehe Commit-Historie).
 
 ## Bewusste Scope-Entscheidungen
 
@@ -83,6 +84,7 @@ Der Umfang war frei wählbar. Umgesetzt wurden, in dieser Priorität:
 - **Quellen-Auswahl per Checkbox, URL-Quelle, vorbefülltes Demo-Notebook, Passwortschutz** — hoher Wirkungsgrad bei geringem Aufwand: ein Reviewer hat typischerweise nur wenige Minuten Zeit, das vorbefüllte Demo-Notebook dürfte davon den größten Unterschied machen
 - **Audio Overview** (Zwei-Stimmen-Podcast) bewusst vor die ursprünglich geplanten "Nice-to-have"-Punkte 1 und 3 gezogen, weil Everlast Voice Agents als eines ihrer Aushängeschilder führt — dieses Feature auszulassen wäre strategisch ungeschickt gewesen. On-demand per Button, nicht automatisch bei jedem Upload, weil TTS im Gegensatz zu Groq ein begrenztes Freikontingent hat.
 - **Reranking und Mind Map** wurden ursprünglich bewusst ausgelassen (siehe unten), nachträglich aber doch ergänzt — Reranking wegen der Skalierbarkeit bei großen Notebooks, Mind Map als weiterer, mit Markmap technisch günstig umsetzbarer Baustein der RAG-Inhaltsaufbereitung.
+- **Zuletzt, weil die Zeit reichte:** die als optional eingeplanten Punkte — mehrere Notebooks parallel verwalten, Study Guide, Notebook umbenennen, Volltext-Ansicht einer Quelle, Einstiegsfragen im leeren Chat. Bewusst am Ende, nicht vorgezogen: keiner davon zeigt etwas über die RAG-Architektur, um die es in der Aufgabe eigentlich geht.
 
 **Explizit nicht umgesetzt** (bewusste Entscheidung, kein Zeitmangel-Zufall):
 
@@ -92,7 +94,7 @@ Der Umfang war frei wählbar. Umgesetzt wurden, in dieser Priorität:
 
 ## Status
 
-Alle Punkte aus MVP, den Tag-5-Erweiterungen, Streaming (Tag 6) und Audio Overview (Tag 8) sind umgesetzt und wurden gegen das echte Live-Deployment getestet — inklusive Fehlerfällen (fehlgeschlagene TTS-Calls, parallele Generierungs-Requests, leeres Notebook).
+Alle Punkte aus MVP, den Tag-5-Erweiterungen, Streaming (Tag 6) und Audio Overview (Tag 8) sind umgesetzt, dazu die nachträglich ergänzten (Reranking, Mind Map, Study Guide, Modell-Fallback) und die optionalen Punkte. Getestet wurde gegen das echte Live-Deployment — inklusive Fehlerfällen (fehlgeschlagene TTS-Calls, erschöpftes Groq-Tageslimit, parallele Generierungs-Requests, leeres Notebook, PDFs ohne Text-Layer).
 
 ## Bekannte Grenzen
 
