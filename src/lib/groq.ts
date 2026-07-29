@@ -355,16 +355,6 @@ function findMatchingBrace(raw: string, start: number): number {
   return -1;
 }
 
-// Ausweich-Fall, v.a. beim Fallback-Modell llama-3.1-8b-instant beobachtet
-// (live reproduziert nach einem Groq-Tageslimit-Fallback): statt eines
-// einzelnen JSON-Arrays antwortet das Modell manchmal mit mehreren einzelnen
-// [{"speaker":...,"text":...}]-Arrays hintereinander (oder laesst die
-// umschliessenden eckigen Klammern ganz weg) -- der strikte Parse des
-// Gesamttexts schlaegt dann fehl, obwohl jedes einzelne Objekt fuer sich
-// valides JSON ist. Statt einer festen Feld-Reihenfolge per Regex zu
-// erwarten, wird hier jedes klammer-balancierte "{...}"-Objekt im Rohtext
-// einzeln per echtem JSON.parse gepruft -- robust gegenueber vertauschter
-// Feld-Reihenfolge und zusaetzlichen Feldern, die das Modell einstreut.
 function isScriptLine(value: unknown): value is AudioScriptLine {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Record<string, unknown>;
@@ -375,53 +365,122 @@ function isScriptLine(value: unknown): value is AudioScriptLine {
   );
 }
 
-function extractScriptObjects(raw: string): unknown[] | null {
-  const objects: unknown[] = [];
+// Erstes klammer-balanciertes "{...}"-Objekt im Rohtext, sofern es sich als
+// JSON-Objekt parsen laesst (z.B. ein Wrapper wie {"titel": "...",
+// "script": [...]}, mit dem manche Modelle das geforderte nackte Array
+// umhuellen).
+function tryParseJsonObjectFromBraces(raw: string): unknown | null {
+  const start = raw.indexOf("{");
+  if (start === -1) return null;
+  const end = findMatchingBrace(raw, start);
+  if (end === -1) return null;
+  try {
+    const value = JSON.parse(raw.slice(start, end + 1));
+    return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function collectScriptArrays(node: unknown, found: AudioScriptLine[][]): void {
+  if (Array.isArray(node)) {
+    if (node.length > 0 && node.every(isScriptLine)) {
+      found.push(node);
+      return;
+    }
+    for (const item of node) collectScriptArrays(item, found);
+    return;
+  }
+  if (node && typeof node === "object") {
+    for (const value of Object.values(node as Record<string, unknown>)) {
+      collectScriptArrays(value, found);
+    }
+  }
+}
+
+// Sucht im geparsten Wrapper-Objekt (beliebig tief) nach dem eigentlichen
+// Skript-Array: dem laengsten Array, dessen Elemente *alle* Gespraechs-Zeilen
+// sind. Bewusst das laengste statt "alle zusammen": Das Modell echot
+// gelegentlich auch das Formatbeispiel aus dem Prompt als zweites, kurzes
+// Array mit -- die Zeilen beider Arrays einzusammeln ergaebe ein doppeltes,
+// wirres Gespraech. Feldnamen werden absichtlich ignoriert (mal "script",
+// mal "dialog", mal "podcast").
+function findLongestScriptArray(root: unknown): AudioScriptLine[] | null {
+  const found: AudioScriptLine[][] = [];
+  collectScriptArrays(root, found);
+  if (found.length === 0) return null;
+  // Bei Gleichstand gewinnt das zuerst gefundene Array.
+  return found.reduce((longest, current) => (current.length > longest.length ? current : longest));
+}
+
+type RawScanResult = { lines: AudioScriptLine[]; sawJson: boolean };
+
+// Letzter Ausweg fuer Antworten, die als Ganzes gar kein valides JSON mehr
+// sind (abgeschnittene Antwort, Trailing-Komma im Array, mehrere separate
+// Arrays hintereinander -- alles live beim Fallback-Modell
+// llama-3.1-8b-instant nach einem Groq-Tageslimit beobachtet): jedes
+// klammer-balancierte "{...}" einzeln parsen und die Gespraechs-Zeilen
+// einsammeln. `sawJson` haelt fest, ob ueberhaupt irgendein JSON-Objekt
+// parsebar war -- nur so laesst sich "gar kein JSON gefunden" von "JSON
+// gefunden, aber keine gueltige Zeile darin" unterscheiden.
+function scanScriptObjects(raw: string): RawScanResult {
+  const lines: AudioScriptLine[] = [];
+  let sawJson = false;
   let i = raw.indexOf("{");
   while (i !== -1) {
     const end = findMatchingBrace(raw, i);
     if (end === -1) {
-      // Diese "{" hat keine passende "}" (z.B. eine Wrapper-Klammer um
-      // eine abgeschnittene Antwort) -- nicht die ganze Suche abbrechen,
-      // sondern ab der naechsten "{" weitersuchen, falls darin vollstaendige
-      // Objekte stecken (z.B. bereits abgeschlossene Gespraechs-Zeilen vor
-      // dem Abbruch).
+      // Keine passende "}" (z.B. Wrapper-Klammer um eine abgeschnittene
+      // Antwort) -- nicht abbrechen, sondern ab der naechsten "{"
+      // weitersuchen: darin koennen bereits abgeschlossene Zeilen stecken.
       i = raw.indexOf("{", i + 1);
       continue;
     }
+    let value: unknown;
     try {
-      const value = JSON.parse(raw.slice(i, end + 1));
-      if (isScriptLine(value)) {
-        objects.push(value);
-        i = raw.indexOf("{", end + 1);
-      } else {
-        // Valides JSON, aber selbst keine Gespraechs-Zeile -- typischerweise
-        // ein Wrapper-Objekt wie {"script": [...]} oder {"titel": "...",
-        // "script": [...]}. Nicht komplett ueberspringen (end + 1), sondern
-        // ab i + 1 weitersuchen, damit die darin verschachtelten
-        // Gespraechs-Zeilen trotzdem gefunden werden.
-        i = raw.indexOf("{", i + 1);
-      }
+      value = JSON.parse(raw.slice(i, end + 1));
     } catch {
-      // Kein valides JSON-Objekt an dieser Stelle -- oft eine Wrapper-
-      // Klammer mit z.B. einem Trailing-Komma im inneren Array. Ab der
-      // naechsten "{" weitersuchen (i + 1, nicht end + 1), damit darin
-      // verschachtelte valide Objekte trotzdem gefunden werden.
+      // Kein valides JSON an dieser Stelle -- ab i + 1 (nicht end + 1)
+      // weitersuchen, damit verschachtelte valide Objekte gefunden werden.
+      i = raw.indexOf("{", i + 1);
+      continue;
+    }
+    sawJson = true;
+    if (isScriptLine(value)) {
+      lines.push(value);
+      i = raw.indexOf("{", end + 1);
+    } else {
       i = raw.indexOf("{", i + 1);
     }
   }
-  return objects.length > 0 ? objects : null;
+  return { lines, sawJson };
+}
+
+// Rueckgabe: null = im Rohtext war ueberhaupt kein parsebares JSON;
+// [] = JSON gefunden, aber keine einzige gueltige Gespraechs-Zeile darin.
+// Die Unterscheidung bestimmt die Fehlermeldung, die im Audio-Overview-UI
+// landet -- eine falsche Meldung fuehrt beim Debuggen in die Irre.
+function extractScriptLines(raw: string): AudioScriptLine[] | null {
+  const array = tryParseJsonArrayFromBrackets(raw);
+  if (array) return array.filter(isScriptLine);
+
+  const wrapper = tryParseJsonObjectFromBraces(raw);
+  if (wrapper) {
+    const scriptArray = findLongestScriptArray(wrapper);
+    if (scriptArray) return scriptArray;
+  }
+
+  const scan = scanScriptObjects(raw);
+  if (scan.lines.length > 0) return scan.lines;
+  return scan.sawJson || wrapper !== null ? [] : null;
 }
 
 // Exportiert, damit die JSON-Parsing-/Validierungslogik isoliert testbar ist.
 export function parseAudioScript(raw: string): AudioScriptLine[] {
-  const parsed = tryParseJsonArrayFromBrackets(raw) ?? extractScriptObjects(raw);
-  if (!parsed) {
+  const lines = extractScriptLines(raw);
+  if (lines === null) {
     throw new Error("Skript-Antwort enthielt kein JSON-Array.");
   }
-
-  const lines = parsed.filter(isScriptLine);
-
   if (lines.length === 0) {
     throw new Error("Skript enthielt keine gültigen Gesprächs-Zeilen.");
   }

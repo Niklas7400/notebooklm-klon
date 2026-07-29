@@ -159,6 +159,34 @@ describe("parseAudioScript", () => {
     expect(parseAudioScript(raw)).toEqual([{ speaker: "A", text: "Hallo" }]);
   });
 
+  it("nimmt aus einem Wrapper nur das laengste Skript-Array, statt ein mit-echotes Formatbeispiel dranzuhaengen", () => {
+    // Das schwaechere Fallback-Modell echot gelegentlich das Formatbeispiel
+    // aus dem Prompt als zweites Array mit -- alle Zeilen einzusammeln
+    // ergaebe ein doppeltes, wirres Gespraech.
+    const raw = JSON.stringify({
+      beispiel: [{ speaker: "A", text: "..." }],
+      script: [
+        { speaker: "A", text: "Hallo" },
+        { speaker: "B", text: "Hi" },
+        { speaker: "A", text: "Los geht's" },
+      ],
+    });
+    expect(parseAudioScript(raw)).toEqual([
+      { speaker: "A", text: "Hallo" },
+      { speaker: "B", text: "Hi" },
+      { speaker: "A", text: "Los geht's" },
+    ]);
+  });
+
+  it("meldet 'keine gueltigen Gespraechs-Zeilen' statt 'kein JSON-Array', wenn valides JSON mit falschem Speaker-Label ankommt", () => {
+    // Sonst zeigt das Audio-Overview-UI eine Ursache an, die gar nicht
+    // zutrifft (JSON war ja da) und fuehrt beim Debuggen in die Irre.
+    const raw = '{"speaker":"Host A","text":"Hallo"}';
+    expect(() => parseAudioScript(raw)).toThrow(
+      "Skript enthielt keine gültigen Gesprächs-Zeilen."
+    );
+  });
+
   it("wirft einen Fehler, wenn kein JSON-Array enthalten ist", () => {
     expect(() => parseAudioScript("Das ist kein JSON.")).toThrow(
       "Skript-Antwort enthielt kein JSON-Array."
