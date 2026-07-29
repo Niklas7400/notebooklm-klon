@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { UploadForm } from "@/components/UploadForm";
 import { Chat } from "@/components/Chat";
 import { GenerateSidebar } from "@/components/GenerateSidebar";
@@ -25,6 +25,31 @@ const SOURCE_ICON_PATHS: Record<SourceKind, string> = {
   text: "M4 6h16M4 12h16M4 18h10",
 };
 
+// Hebt die zitierte Stelle im Quellen-Volltext hervor (Klick auf einen
+// [chunk:N]-Verweis im Chat, siehe handleCitationClick). Das Snippet ist der
+// exakte Chunk-Inhalt und damit ein Teilstring des Rohtexts -- kein Treffer
+// (z.B. bei unerwarteten Whitespace-Abweichungen) faellt einfach auf die
+// unmarkierte Anzeige zurueck, statt einen Fehler zu werfen.
+function renderHighlightedSourceText(
+  rawText: string,
+  highlight: string | null,
+  highlightRef: RefObject<HTMLElement | null>
+): ReactNode {
+  if (!highlight) return rawText;
+  const idx = rawText.indexOf(highlight);
+  if (idx === -1) return rawText;
+
+  return (
+    <>
+      {rawText.slice(0, idx)}
+      <mark ref={highlightRef} className="rounded-sm bg-accent-700/50 text-inherit">
+        {rawText.slice(idx, idx + highlight.length)}
+      </mark>
+      {rawText.slice(idx + highlight.length)}
+    </>
+  );
+}
+
 export function NotebookWorkspace({
   notebook,
   sources,
@@ -42,6 +67,18 @@ export function NotebookWorkspace({
     filename: string;
     raw_text: string;
   } | null>(null);
+  const [highlightedSnippet, setHighlightedSnippet] = useState<string | null>(null);
+  const highlightRef = useRef<HTMLElement>(null);
+
+  // Beim Klick auf einen Zitat-Verweis im Chat wird die passende Quelle in
+  // der Sidebar aufgeklappt (siehe handleViewSource) und die zitierte Stelle
+  // markiert -- sobald sie im DOM steht, dorthin scrollen, damit sie auch bei
+  // langen Quellentexten sichtbar wird, ohne dass der Nutzer selbst suchen muss.
+  useEffect(() => {
+    if (highlightedSnippet && viewingSource) {
+      highlightRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+  }, [highlightedSnippet, viewingSource]);
   const [excludedSourceIds, setExcludedSourceIds] = useState<Set<string>>(
     new Set(),
   );
@@ -141,11 +178,21 @@ export function NotebookWorkspace({
     }
   }
 
-  async function handleViewSource(sourceId: string) {
+  async function handleViewSource(sourceId: string, snippetToHighlight: string | null = null) {
     const res = await fetch(`/api/sources/${sourceId}`);
     if (res.ok) {
       setViewingSource(await res.json());
+      setHighlightedSnippet(snippetToHighlight);
     }
+  }
+
+  // Zusaetzlich zur bestehenden Snippet-Anzeige im Chat (siehe
+  // selectedCitation): die referenzierte Quelle links in der Sidebar
+  // aufklappen und die zitierte Stelle direkt im Volltext hervorheben.
+  function handleCitationClick(citation: Citation) {
+    setSelectedCitation(citation);
+    setSourcesOpen(true);
+    handleViewSource(citation.source_id, citation.snippet);
   }
 
   async function confirmDeleteNotebook() {
@@ -417,7 +464,10 @@ export function NotebookWorkspace({
                     </span>
                     <button
                       type="button"
-                      onClick={() => setViewingSource(null)}
+                      onClick={() => {
+                        setViewingSource(null);
+                        setHighlightedSnippet(null);
+                      }}
                       className="shrink-0 cursor-pointer border-0 bg-transparent text-neutral-500 hover:text-neutral-300"
                       aria-label="Schließen"
                     >
@@ -425,7 +475,11 @@ export function NotebookWorkspace({
                     </button>
                   </div>
                   <p className="m-0 max-h-[32rem] overflow-y-auto text-justify text-xs leading-[1.6] whitespace-pre-wrap text-neutral-400">
-                    {viewingSource.raw_text}
+                    {renderHighlightedSourceText(
+                      viewingSource.raw_text,
+                      highlightedSnippet,
+                      highlightRef
+                    )}
                   </p>
                 </div>
               )}
@@ -493,7 +547,7 @@ export function NotebookWorkspace({
               sourceIds={activeSourceIds}
               suggestedQuestions={suggestedQuestions}
               selectedCitation={selectedCitation}
-              onCitationClick={setSelectedCitation}
+              onCitationClick={handleCitationClick}
               onCloseCitation={() => setSelectedCitation(null)}
             />
           )}
