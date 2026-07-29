@@ -35,18 +35,22 @@ export function NotebookWorkspace({
   initialMessages: Message[];
 }) {
   const router = useRouter();
-  const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
+  const [selectedCitation, setSelectedCitation] = useState<Citation | null>(
+    null,
+  );
   const [viewingSource, setViewingSource] = useState<{
     filename: string;
     raw_text: string;
   } | null>(null);
-  const [excludedSourceIds, setExcludedSourceIds] = useState<Set<string>>(new Set());
+  const [excludedSourceIds, setExcludedSourceIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [summary, setSummary] = useState(notebook.summary);
   const [summarizing, setSummarizing] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [chatResetKey, setChatResetKey] = useState(0);
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>(
-    notebook.suggested_questions ?? []
+    notebook.suggested_questions ?? [],
   );
   const [title, setTitle] = useState(notebook.title);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -54,6 +58,7 @@ export function NotebookWorkspace({
   const [uploadOpen, setUploadOpen] = useState(false);
   const [resetChatOpen, setResetChatOpen] = useState(false);
   const [deleteNotebookOpen, setDeleteNotebookOpen] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(true);
 
   async function handleRenameSubmit() {
     const nextTitle = titleDraft.trim();
@@ -90,7 +95,9 @@ export function NotebookWorkspace({
     setUploadOpen(false);
     setSummarizing(true);
     try {
-      const res = await fetch(`/api/notebooks/${notebook.id}/summary`, { method: "POST" });
+      const res = await fetch(`/api/notebooks/${notebook.id}/summary`, {
+        method: "POST",
+      });
       if (res.ok) {
         const data = await res.json();
         setSummary(data.summary);
@@ -102,9 +109,12 @@ export function NotebookWorkspace({
     // Vorgeschlagene Einstiegsfragen nach jedem Upload neu erzeugen, damit
     // sie zu den aktuell vorhandenen Quellen passen (unabhaengig von der
     // Zusammenfassung, kein Grund den Chat-Aufbau darauf warten zu lassen).
-    const questionsRes = await fetch(`/api/notebooks/${notebook.id}/suggested-questions`, {
-      method: "POST",
-    });
+    const questionsRes = await fetch(
+      `/api/notebooks/${notebook.id}/suggested-questions`,
+      {
+        method: "POST",
+      },
+    );
     if (questionsRes.ok) {
       const data = await questionsRes.json();
       setSuggestedQuestions(data.questions);
@@ -120,6 +130,8 @@ export function NotebookWorkspace({
         return next;
       });
       if (viewingSource) setViewingSource(null);
+      const body = await res.json().catch(() => null);
+      if (body && "summary" in body) setSummary(body.summary);
       router.refresh();
     }
   }
@@ -132,7 +144,9 @@ export function NotebookWorkspace({
   }
 
   async function confirmDeleteNotebook() {
-    const res = await fetch(`/api/notebooks/${notebook.id}`, { method: "DELETE" });
+    const res = await fetch(`/api/notebooks/${notebook.id}`, {
+      method: "DELETE",
+    });
     if (res.ok) {
       router.push("/");
     } else {
@@ -143,7 +157,9 @@ export function NotebookWorkspace({
   }
 
   async function confirmResetChat() {
-    const res = await fetch(`/api/notebooks/${notebook.id}/messages`, { method: "DELETE" });
+    const res = await fetch(`/api/notebooks/${notebook.id}/messages`, {
+      method: "DELETE",
+    });
     setResetChatOpen(false);
     if (res.ok) {
       setChatResetKey((k) => k + 1);
@@ -197,7 +213,11 @@ export function NotebookWorkspace({
           <button
             type="button"
             className="btn btn-ghost gap-2"
-            style={{ color: "var(--color-text)", fontFamily: "var(--font-heading)", fontSize: "15px" }}
+            style={{
+              color: "var(--color-text)",
+              fontFamily: "var(--font-heading)",
+              fontSize: "15px",
+            }}
             onClick={() => {
               setTitleDraft(title);
               setEditingTitle(true);
@@ -224,7 +244,11 @@ export function NotebookWorkspace({
         {notebook.is_demo && <span className="tag tag-accent">Demo</span>}
 
         <div className="ml-auto flex items-center gap-2">
-          <button type="button" className="btn btn-secondary" onClick={() => setResetChatOpen(true)}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setResetChatOpen(true)}
+          >
             <svg
               width="14"
               height="14"
@@ -245,7 +269,11 @@ export function NotebookWorkspace({
             className="btn btn-secondary"
             style={{ color: "var(--color-danger)" }}
             disabled={notebook.is_demo}
-            title={notebook.is_demo ? "Das Demo-Notebook kann nicht gelöscht werden." : undefined}
+            title={
+              notebook.is_demo
+                ? "Das Demo-Notebook kann nicht gelöscht werden."
+                : undefined
+            }
             onClick={() => setDeleteNotebookOpen(true)}
           >
             <svg
@@ -268,97 +296,24 @@ export function NotebookWorkspace({
       </nav>
 
       <div className="flex flex-1 overflow-hidden">
-        <aside className="flex w-1/4 shrink-0 flex-col gap-[22px] overflow-y-auto border-r border-divider p-5">
-          <div>
-            <h6 className="m-0 mb-2.5 text-neutral-400">Quellen · {sources.length}</h6>
-            {sources.length === 0 ? (
-              <p className="m-0 text-xs text-neutral-500">Noch keine Quelle hochgeladen.</p>
-            ) : (
-              <div className="flex flex-col gap-1.5">
-                {sources.map((s) => {
-                  const kind = getSourceKind(s.filename);
-                  return (
-                    <div
-                      key={s.id}
-                      className="flex items-center gap-2 rounded-md border border-divider px-2 py-1.5"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={!excludedSourceIds.has(s.id)}
-                        onChange={() => toggleSource(s.id)}
-                        className="shrink-0 cursor-pointer accent-accent"
-                        title="In die Suche einbeziehen"
-                      />
-                      <svg
-                        width="13"
-                        height="13"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="var(--color-neutral-500)"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="shrink-0"
-                      >
-                        <path d={SOURCE_ICON_PATHS[kind]} />
-                      </svg>
-                      <button
-                        type="button"
-                        onClick={() => handleViewSource(s.id)}
-                        className="min-w-0 flex-1 cursor-pointer truncate border-0 bg-transparent p-0 text-left text-[12.5px] text-text"
-                        title={`${s.filename} — Volltext anzeigen`}
-                      >
-                        {s.filename}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteSource(s.id)}
-                        className="shrink-0 cursor-pointer border-0 bg-transparent p-0.5 text-neutral-600 hover:text-danger"
-                        aria-label={`${s.filename} löschen`}
-                      >
-                        <svg
-                          width="12"
-                          height="12"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                        >
-                          <path d="M18 6L6 18M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
+        <aside
+          className="flex shrink-0 flex-col overflow-y-auto overflow-x-hidden border-r border-divider transition-[width] duration-[180ms] ease-in-out"
+          style={{ width: sourcesOpen ? "25%" : 56 }}
+        >
+          <div
+            className={`flex shrink-0 items-center px-3.5 pt-4 pb-2 ${sourcesOpen ? "justify-between" : "justify-center"}`}
+          >
+            {sourcesOpen && (
+              <h6 className="m-0 whitespace-nowrap text-neutral-400">
+                Quellen · {sources.length}
+              </h6>
             )}
-
-            {viewingSource && (
-              <div className="mt-2 rounded-md border border-divider bg-surface p-2.5">
-                <div className="mb-1.5 flex items-center justify-between gap-2">
-                  <span className="truncate text-xs font-medium" title={viewingSource.filename}>
-                    {viewingSource.filename}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setViewingSource(null)}
-                    className="shrink-0 cursor-pointer border-0 bg-transparent text-neutral-500 hover:text-neutral-300"
-                    aria-label="Schließen"
-                  >
-                    ✕
-                  </button>
-                </div>
-                <p className="m-0 max-h-[32rem] overflow-y-auto text-xs leading-[1.6] whitespace-pre-wrap text-neutral-400">
-                  {viewingSource.raw_text}
-                </p>
-              </div>
-            )}
-
             <button
               type="button"
-              className="btn btn-secondary btn-block mt-2.5"
-              onClick={() => setUploadOpen(true)}
+              className="btn btn-icon btn-ghost"
+              onClick={() => setSourcesOpen((o) => !o)}
+              title={sourcesOpen ? "Einklappen" : "Ausklappen"}
+              aria-label={sourcesOpen ? "Einklappen" : "Ausklappen"}
             >
               <svg
                 width="14"
@@ -369,14 +324,153 @@ export function NotebookWorkspace({
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
+                className="transition-transform duration-150"
+                style={{
+                  transform: sourcesOpen ? "rotate(180deg)" : "rotate(0deg)",
+                }}
               >
-                <path d="M12 3v12" />
-                <path d="M6.5 9L12 3.5 17.5 9" />
-                <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+                <path d="M9 18l6-6-6-6" />
               </svg>
-              Quelle hinzufügen
             </button>
           </div>
+
+          {sourcesOpen ? (
+            <div className="flex flex-col gap-[22px] px-5 pb-5">
+              {sources.length === 0 ? (
+                <p className="m-0 text-xs text-neutral-500">
+                  Noch keine Quelle hochgeladen.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  {sources.map((s) => {
+                    const kind = getSourceKind(s.filename);
+                    return (
+                      <div
+                        key={s.id}
+                        className="flex items-center gap-2 rounded-md border border-divider px-2 py-1.5"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!excludedSourceIds.has(s.id)}
+                          onChange={() => toggleSource(s.id)}
+                          className="shrink-0 cursor-pointer accent-accent"
+                          title="In die Suche einbeziehen"
+                        />
+                        <svg
+                          width="13"
+                          height="13"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="var(--color-neutral-500)"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="shrink-0"
+                        >
+                          <path d={SOURCE_ICON_PATHS[kind]} />
+                        </svg>
+                        <button
+                          type="button"
+                          onClick={() => handleViewSource(s.id)}
+                          className="min-w-0 flex-1 cursor-pointer truncate border-0 bg-transparent p-0 text-left text-[12.5px] text-text"
+                          title={`${s.filename} — Volltext anzeigen`}
+                        >
+                          {s.filename}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSource(s.id)}
+                          className="shrink-0 cursor-pointer border-0 bg-transparent p-0.5 text-neutral-600 hover:text-danger"
+                          aria-label={`${s.filename} löschen`}
+                        >
+                          <svg
+                            width="12"
+                            height="12"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                          >
+                            <path d="M18 6L6 18M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {viewingSource && (
+                <div className="mt-2 rounded-md border border-divider bg-surface p-2.5">
+                  <div className="mb-1.5 flex items-center justify-between gap-2">
+                    <span
+                      className="truncate text-xs font-medium"
+                      title={viewingSource.filename}
+                    >
+                      {viewingSource.filename}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setViewingSource(null)}
+                      className="shrink-0 cursor-pointer border-0 bg-transparent text-neutral-500 hover:text-neutral-300"
+                      aria-label="Schließen"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <p className="m-0 max-h-[32rem] overflow-y-auto text-xs leading-[1.6] whitespace-pre-wrap text-neutral-400">
+                    {viewingSource.raw_text}
+                  </p>
+                </div>
+              )}
+
+              <button
+                type="button"
+                className="btn btn-secondary btn-block mt-2.5"
+                onClick={() => setUploadOpen(true)}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M12 3v12" />
+                  <path d="M6.5 9L12 3.5 17.5 9" />
+                  <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+                </svg>
+                Quelle hinzufügen
+              </button>
+            </div>
+          ) : (
+            <div className="flex w-14 flex-col items-center gap-3 pt-0.5">
+              <button
+                type="button"
+                className="btn btn-icon btn-ghost"
+                onClick={() => setSourcesOpen(true)}
+                title="Quellen"
+                aria-label="Quellen"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M4 6h16M4 12h16M4 18h10" />
+                </svg>
+              </button>
+            </div>
+          )}
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -415,7 +509,11 @@ export function NotebookWorkspace({
         />
       </div>
 
-      <Dialog open={uploadOpen} onClose={() => setUploadOpen(false)} title="Quelle hinzufügen">
+      <Dialog
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        title="Quelle hinzufügen"
+      >
         <UploadForm
           notebookId={notebook.id}
           onUploaded={handleUploaded}
@@ -429,7 +527,10 @@ export function NotebookWorkspace({
         title="Chatverlauf zurücksetzen?"
         actions={
           <>
-            <button className="btn btn-secondary" onClick={() => setResetChatOpen(false)}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setResetChatOpen(false)}
+            >
               Abbrechen
             </button>
             <button
@@ -451,7 +552,10 @@ export function NotebookWorkspace({
         title="Notebook löschen?"
         actions={
           <>
-            <button className="btn btn-secondary" onClick={() => setDeleteNotebookOpen(false)}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setDeleteNotebookOpen(false)}
+            >
               Abbrechen
             </button>
             <button
@@ -464,7 +568,8 @@ export function NotebookWorkspace({
           </>
         }
       >
-        „{title}“ wird unwiderruflich gelöscht, inklusive aller Quellen und des Chatverlaufs.
+        „{title}“ wird unwiderruflich gelöscht, inklusive aller Quellen und des
+        Chatverlaufs.
       </Dialog>
     </div>
   );
