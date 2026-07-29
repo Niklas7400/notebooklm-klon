@@ -2,10 +2,38 @@ import { extractText, getDocumentProxy } from "unpdf";
 
 export const MIN_SOURCE_TEXT_LENGTH = 50;
 
+// PDFs mit unvollstaendiger ToUnicode-Zuordnung fuer Ligaturen (z.B. "ffi",
+// "ff") liefern an dieser Stelle vereinzelt rohe Steuerzeichen statt der
+// eigentlichen Buchstaben -- beobachtet als NUL-Byte anstelle von "ff" in
+// "Affect". Ein eingebettetes NUL-Byte bringt spaeter den Insert nach
+// Supabase zu Fall (Postgres/PostgREST lehnt Text mit NUL-Byte beim JSON-
+// Parsing mit "unsupported Unicode escape sequence" ab), weit entfernt vom
+// eigentlichen Ursprung in der PDF-Extraktion. Deshalb hier direkt bereinigen,
+// statt das erst beim DB-Insert scheitern zu lassen. Zeichencode-Vergleich
+// statt Regex-Zeichenklasse mit Steuerzeichen-Escapes im Quelltext.
+function isStrippableControlCharCode(code: number): boolean {
+  const isTab = code === 9;
+  const isLineFeed = code === 10;
+  const isCarriageReturn = code === 13;
+  const isC0Control = code <= 31;
+  const isDelete = code === 127;
+  return (isC0Control && !isTab && !isLineFeed && !isCarriageReturn) || isDelete;
+}
+
+export function stripControlChars(text: string): string {
+  let result = "";
+  for (let i = 0; i < text.length; i++) {
+    if (!isStrippableControlCharCode(text.charCodeAt(i))) {
+      result += text[i];
+    }
+  }
+  return result;
+}
+
 export async function extractPdfText(buffer: ArrayBuffer): Promise<string> {
   const pdf = await getDocumentProxy(new Uint8Array(buffer));
   const { text } = await extractText(pdf, { mergePages: true });
-  return text.trim();
+  return stripControlChars(text.trim());
 }
 
 export function validateSourceText(text: string): string | null {

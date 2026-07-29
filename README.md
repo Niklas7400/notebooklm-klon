@@ -87,7 +87,8 @@ Alle Punkte aus MVP, den Tag-5-Erweiterungen, Streaming (Tag 6) und Audio Overvi
 
 ## Bekannte Grenzen
 
-- **Kein OCR**: Gescannte PDFs ohne Text-Layer liefern leeren Text und werden mit einer klaren Fehlermeldung abgelehnt, statt sie stillschweigend als leere Quelle zu speichern.
+- **Kein OCR**: Gescannte PDFs ohne Text-Layer liefern leeren Text und werden mit einer klaren Fehlermeldung abgelehnt, statt sie stillschweigend als leere Quelle zu speichern. Betrifft insbesondere ältere, über Dokumentlieferdienste bezogene PDFs (z. B. "ImagePDF"-Producer), die reine Seiten-Scans ohne Text-Layer sind.
+- **PDFs mit defekter Ligatur-Kodierung**: Manche (v. a. ältere) PDFs bilden Ligaturen wie "ffi"/"ff" nicht korrekt auf Unicode ab und liefern an dieser Stelle rohe Steuerzeichen statt der eigentlichen Buchstaben (beobachtet: ein NUL-Byte anstelle von "ff" in "Affect"). Ein eingebettetes NUL-Byte hätte den Insert nach Supabase mit einem kryptischen "unsupported Unicode escape sequence"-Fehler scheitern lassen — `extractPdfText` bereinigt daher alle Steuerzeichen außer Tab/Zeilenumbruch/Wagenrücklauf. Die betroffene Ligatur fehlt dadurch im Text (z. B. "Aect" statt "Affect"), was für die Suche/das Chatten vernachlässigbar ist.
 - **Keine Hybrid-Suche**: Nur Vektorsuche (plus Reranking, siehe Architektur), keine Kombination mit klassischer Stichwortsuche (BM25 o.ä.) — bei sehr spezifischen Eigennamen/Zahlen kann das reine Embedding-Matching schwächer sein. Nächster naheliegender Qualitätsschritt, wurde für dieses Projekt aber bewusst nicht gebaut.
 - **Keine Mandantentrennung**: Alle Notebooks liegen in derselben Tabelle ohne User-Scoping — passend zum Deployment als einzelner Demo-Zugang, nicht für Mehrbenutzerbetrieb gedacht.
 - **HTML-Extraktion bei URL-Quellen** ist eine einfache, Regex-basierte Bereinigung (kein Readability-Algorithmus) — bei Seiten mit viel Navigations-/Boilerplate-Text landet dieser mit im extrahierten Text.

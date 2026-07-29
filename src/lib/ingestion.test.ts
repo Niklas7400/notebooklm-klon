@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decodeHtmlEntities, htmlToText, validateSourceText } from "./ingestion";
+import { decodeHtmlEntities, htmlToText, stripControlChars, validateSourceText } from "./ingestion";
 
 describe("validateSourceText", () => {
   it("lehnt leeren Text ab", () => {
@@ -53,5 +53,30 @@ describe("htmlToText", () => {
 
   it("kollabiert mehrfachen Leerraum zu einem einzigen Leerzeichen", () => {
     expect(htmlToText("<p>Zu     viele     Leerzeichen</p>")).toBe("Zu viele Leerzeichen");
+  });
+});
+
+describe("stripControlChars", () => {
+  it("entfernt ein eingebettetes NUL-Byte (z.B. aus einer defekten PDF-Ligatur)", () => {
+    const nul = String.fromCharCode(0);
+    expect(stripControlChars(`A${nul}ect`)).toBe("Aect");
+  });
+
+  it("entfernt weitere C0-Steuerzeichen ausserhalb von Tab/LF/CR", () => {
+    const stx = String.fromCharCode(2);
+    const canc = String.fromCharCode(24);
+    const del = String.fromCharCode(127);
+    expect(stripControlChars(`vor${stx}mitte${canc}nach${del}ende`)).toBe("vormittenachende");
+  });
+
+  it("laesst Tab, Zeilenumbruch und Wagenruecklauf unangetastet", () => {
+    const text = "Zeile1\nZeile2\tSpalte\rEnde";
+    expect(stripControlChars(text)).toBe(text);
+  });
+
+  it("laesst normalen Text unveraendert", () => {
+    expect(stripControlChars("Ganz normaler Text ohne Steuerzeichen.")).toBe(
+      "Ganz normaler Text ohne Steuerzeichen."
+    );
   });
 });
