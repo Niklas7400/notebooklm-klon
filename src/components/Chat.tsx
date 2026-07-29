@@ -25,7 +25,7 @@ function renderContent(
         key={`c-${key++}`}
         type="button"
         onClick={() => onCitationClick(citation)}
-        className="mx-0.5 inline-flex rounded-[5px] border-0 bg-accent-800 px-1.5 py-px text-[11px] font-medium text-accent-100"
+        className="mx-0.5 inline-flex cursor-pointer rounded-[5px] border-0 bg-accent-800 px-1.5 py-px text-[11px] font-medium text-accent-100"
       >
         {segment.localId}
       </button>
