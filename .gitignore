@@ -37,6 +37,10 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Claude Code: interner Rohverlauf (Duplikat von claude-code-session.md,
+# der exportierten Session fuer die Abgabe -- die wird bewusst committet)
+.cc-history/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
