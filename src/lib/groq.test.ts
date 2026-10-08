@@ -1,0 +1,223 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { parseAudioScript, rewriteQuery, stripMarkdownCodeFence, summarizeSources } from "./groq";
+
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), { status });
+}
+
+function groqSuccessBody(content: string) {
+  return { choices: [{ message: { content } }] };
+}
+
+function groqRateLimitBody() {
+  return {
+    error: {
+      message:
+        "Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_test` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 99640, Requested 3297. Please try again in 42m17.568s.",
+      type: "tokens",
+      code: "rate_limit_exceeded",
+    },
+  };
+}
+
+describe("Fallback-Modell bei Groq-Tageslimit", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("faellt bei einem 429 des Hauptmodells automatisch auf das Ausweichmodell zurueck", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(429, groqRateLimitBody()))
+      .mockResolvedValueOnce(jsonResponse(200, groqSuccessBody("Zusammenfassung vom Ausweichmodell")));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await summarizeSources("Quellenkontext");
+
+    expect(result).toEqual({
+      text: "Zusammenfassung vom Ausweichmodell",
+      usedFallbackModel: true,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const secondCallBody = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(secondCallBody.model).toBe("llama-3.1-8b-instant");
+  });
+
+  it("nutzt das Hauptmodell direkt, wenn es nicht rate-limitiert ist", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, groqSuccessBody("Normale Zusammenfassung")));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await summarizeSources("Quellenkontext");
+
+    expect(result).toEqual({ text: "Normale Zusammenfassung", usedFallbackModel: false });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("wirft bei einem Nicht-Rate-Limit-Fehler die eigentliche Groq-Fehlermeldung, nicht den rohen JSON-Body", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      jsonResponse(401, { error: { message: "Invalid API Key", type: "invalid_request_error" } })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(rewriteQuery("Frage", [])).rejects.toThrow("Invalid API Key");
+  });
+});
+
+describe("parseAudioScript", () => {
+  it("parst ein sauberes JSON-Array", () => {
+    const raw = '[{"speaker":"A","text":"Hallo"},{"speaker":"B","text":"Hi zurück"}]';
+    expect(parseAudioScript(raw)).toEqual([
+      { speaker: "A", text: "Hallo" },
+      { speaker: "B", text: "Hi zurück" },
+    ]);
+  });
+
+  it("ist tolerant gegenüber Text vor/nach dem JSON-Array (z.B. Markdown-Codeblock)", () => {
+    const raw = '```json\n[{"speaker":"A","text":"Hallo"}]\n```';
+    expect(parseAudioScript(raw)).toEqual([{ speaker: "A", text: "Hallo" }]);
+  });
+
+  it("filtert Zeilen mit ungültigem Speaker oder leerem Text heraus", () => {
+    const raw = JSON.stringify([
+      { speaker: "A", text: "Gültig" },
+      { speaker: "C", text: "Ungültiger Speaker" },
+      { speaker: "B", text: "   " },
+      { speaker: "B", text: "Auch gültig" },
+    ]);
+    expect(parseAudioScript(raw)).toEqual([
+      { speaker: "A", text: "Gültig" },
+      { speaker: "B", text: "Auch gültig" },
+    ]);
+  });
+
+  it("loest einzelne Zeilen heraus, wenn das Modell mehrere separate Arrays statt eines einzigen liefert (live gegen das Fallback-Modell reproduziert)", () => {
+    const raw = [
+      '[{"speaker":"A","text":"Hallo und willkommen!"}]',
+      '[{"speaker":"B","text":"Schön, dass du da bist."}]',
+      '[{"speaker":"A","text":"Fangen wir an."}]',
+    ].join("\n\n");
+    expect(parseAudioScript(raw)).toEqual([
+      { speaker: "A", text: "Hallo und willkommen!" },
+      { speaker: "B", text: "Schön, dass du da bist." },
+      { speaker: "A", text: "Fangen wir an." },
+    ]);
+  });
+
+  it("loest einzelne Objekte auch heraus, wenn gar keine umschliessenden eckigen Klammern vorhanden sind", () => {
+    const raw = '{"speaker":"A","text":"Ohne Array"}\n{"speaker":"B","text":"Auch ohne Array"}';
+    expect(parseAudioScript(raw)).toEqual([
+      { speaker: "A", text: "Ohne Array" },
+      { speaker: "B", text: "Auch ohne Array" },
+    ]);
+  });
+
+  it("ist tolerant gegenüber vertauschter Feld-Reihenfolge und zusätzlichen Feldern im Fallback-Fall", () => {
+    const raw =
+      '{"text":"Text zuerst, Speaker danach","speaker":"A"}\n' +
+      '{"speaker":"B","emotion":"happy","text":"Mit Extra-Feld"}';
+    expect(parseAudioScript(raw)).toEqual([
+      { speaker: "A", text: "Text zuerst, Speaker danach" },
+      { speaker: "B", emotion: "happy", text: "Mit Extra-Feld" },
+    ]);
+  });
+
+  it("findet verschachtelte Zeilen, wenn die umschliessende Wrapper-Klammer selbst wegen eines Trailing-Kommas ungueltig ist", () => {
+    const raw = '{"script": [{"speaker":"A","text":"Hallo"}, {"speaker":"B","text":"Hi"},]}';
+    expect(parseAudioScript(raw)).toEqual([
+      { speaker: "A", text: "Hallo" },
+      { speaker: "B", text: "Hi" },
+    ]);
+  });
+
+  it("findet bereits vollstaendige Zeilen, auch wenn die Antwort mitten in der naechsten Zeile abgeschnitten ist", () => {
+    const raw =
+      '{"script":[{"speaker":"A","text":"Hallo"},{"speaker":"B","text":"Hi"},{"speaker":"A","text":"Trunc';
+    expect(parseAudioScript(raw)).toEqual([
+      { speaker: "A", text: "Hallo" },
+      { speaker: "B", text: "Hi" },
+    ]);
+  });
+
+  it("schaut in ein gueltig geparstes Wrapper-Objekt hinein, statt es als Ganzes zu verwerfen (Wrapper-Klammer enthaelt selbst kein 'speaker'/'text')", () => {
+    // Ein "[" im Wrapper-Feld "titel" liegt vor dem eigentlichen
+    // Script-Array -- die einfache Klammer-Slice-Strategie (erstes "[" bis
+    // letztes "]") wuerde hier ueber die Objektgrenze hinaus falsch schneiden.
+    const raw =
+      '{"titel":"Podcast [Folge 1]","script":[{"speaker":"A","text":"Hallo"},{"speaker":"B","text":"Hi"}]}';
+    expect(parseAudioScript(raw)).toEqual([
+      { speaker: "A", text: "Hallo" },
+      { speaker: "B", text: "Hi" },
+    ]);
+  });
+
+  it("schaut in ein gueltig geparstes Wrapper-Objekt hinein, wenn nach dem Script-Array noch ein weiteres Array-Feld folgt", () => {
+    // "tags" nach "script" verschiebt das lastIndexOf("]") auf das falsche
+    // Array-Ende.
+    const raw = '{"script":[{"speaker":"A","text":"Hallo"}],"tags":["intro"]}';
+    expect(parseAudioScript(raw)).toEqual([{ speaker: "A", text: "Hallo" }]);
+  });
+
+  it("nimmt aus einem Wrapper nur das laengste Skript-Array, statt ein mit-echotes Formatbeispiel dranzuhaengen", () => {
+    // Das schwaechere Fallback-Modell echot gelegentlich das Formatbeispiel
+    // aus dem Prompt als zweites Array mit -- alle Zeilen einzusammeln
+    // ergaebe ein doppeltes, wirres Gespraech.
+    const raw = JSON.stringify({
+      beispiel: [{ speaker: "A", text: "..." }],
+      script: [
+        { speaker: "A", text: "Hallo" },
+        { speaker: "B", text: "Hi" },
+        { speaker: "A", text: "Los geht's" },
+      ],
+    });
+    expect(parseAudioScript(raw)).toEqual([
+      { speaker: "A", text: "Hallo" },
+      { speaker: "B", text: "Hi" },
+      { speaker: "A", text: "Los geht's" },
+    ]);
+  });
+
+  it("meldet 'keine gueltigen Gespraechs-Zeilen' statt 'kein JSON-Array', wenn valides JSON mit falschem Speaker-Label ankommt", () => {
+    // Sonst zeigt das Audio-Overview-UI eine Ursache an, die gar nicht
+    // zutrifft (JSON war ja da) und fuehrt beim Debuggen in die Irre.
+    const raw = '{"speaker":"Host A","text":"Hallo"}';
+    expect(() => parseAudioScript(raw)).toThrow(
+      "Skript enthielt keine gültigen Gesprächs-Zeilen."
+    );
+  });
+
+  it("wirft einen Fehler, wenn kein JSON-Array enthalten ist", () => {
+    expect(() => parseAudioScript("Das ist kein JSON.")).toThrow(
+      "Skript-Antwort enthielt kein JSON-Array."
+    );
+  });
+
+  it("wirft einen Fehler, wenn nach dem Filtern keine gültigen Zeilen übrig bleiben", () => {
+    const raw = JSON.stringify([{ speaker: "C", text: "Ungültig" }]);
+    expect(() => parseAudioScript(raw)).toThrow(
+      "Skript enthielt keine gültigen Gesprächs-Zeilen."
+    );
+  });
+});
+
+describe("stripMarkdownCodeFence", () => {
+  it("gibt unveraendertes Markdown zurueck, wenn kein Codeblock vorhanden ist", () => {
+    const raw = "# Titel\n## Ast\n- Punkt";
+    expect(stripMarkdownCodeFence(raw)).toBe(raw);
+  });
+
+  it("entfernt einen ```markdown-Codeblock-Wrapper", () => {
+    const raw = "```markdown\n# Titel\n## Ast\n- Punkt\n```";
+    expect(stripMarkdownCodeFence(raw)).toBe("# Titel\n## Ast\n- Punkt");
+  });
+
+  it("entfernt einen Codeblock-Wrapper ohne Sprachangabe", () => {
+    const raw = "```\n# Titel\n- Punkt\n```";
+    expect(stripMarkdownCodeFence(raw)).toBe("# Titel\n- Punkt");
+  });
+
+  it("trimmt umgebende Leerzeichen/Zeilenumbrueche", () => {
+    expect(stripMarkdownCodeFence("  \n# Titel\n  \n")).toBe("# Titel");
+  });
+});

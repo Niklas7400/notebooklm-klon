@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+.env*
+!.env.example
+tmp-audio-test
+npm-debug.log*
+NOTES.md
+*.md
+!README.md
+coverage
