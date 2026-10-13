@@ -5,7 +5,7 @@ bewusst nicht sofort umgesetzt wurden (Zeitrahmen, kein akuter Bug).
 
 ## Zusammenfassungs-Prompt liefert manchmal zwei Varianten statt einer
 
-Beobachtet beim Testen (Tag 5): Der Summary-Prompt in
+Beobachtet beim Testen: Der Summary-Prompt in
 `summarizeSources()` (`src/lib/groq.ts`) sagt "3-6 Sätze **oder** kurze
 Bullet Points". Llama hat das mindestens einmal als "biete beides an"
 interpretiert und einen Fließtext-Absatz plus direkt danach eine
@@ -22,7 +22,7 @@ Formatvorgaben weniger zuverlaessig an eine einzige Variante.
 
 ## Modell haelt sich nicht immer an "nur aus den Quellen antworten"
 
-Beobachtet beim Testen (Tag 5, Checkbox-Feature): Bei einer Frage, zu
+Beobachtet beim Testen (Checkbox-Feature): Bei einer Frage, zu
 der die ausgewählten Quellen keine Antwort enthalten, hat die Antwort
 zunächst korrekt gesagt "die Quellenausschnitte enthalten keine
 Informationen darüber" -- ist dann aber trotzdem in eine allgemeine,
@@ -46,7 +46,7 @@ Haeufigkeit aber senken.
 
 ## TTS-Aussprache englischer Fachbegriffe im Audio Overview
 
-Beobachtet beim Testen (Tag 8): Mit den urspruenglichen WaveNet-Stimmen
+Beobachtet beim Testen: Mit den urspruenglichen WaveNet-Stimmen
 sprach Google Cloud TTS englische Fachbegriffe im sonst deutschen
 Podcast-Skript (RAG, Embedding, Voice AI Agents, ...) mit deutscher
 Phonetik aus, weil die gesamte Zeile mit `languageCode: "de-DE"`
