@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// Middleware-Passwort-Gate (siehe CLAUDE.md): schuetzt die Demo-Deployment
+// Middleware-Passwort-Gate (siehe CLAUDE.md): schuetzt das Demo-Deployment
 // gegen fremde Besucher/Crawler, die das taegliche Groq-Free-Tier-Kontingent
-// verbrauchen koennten, bevor der Reviewer die App testet. Kein Vercel-Add-on
-// noetig. In Next.js 16 heisst die Datei "proxy.ts" (frueher "middleware.ts").
+// verbrauchen koennten. Kein Vercel-Add-on noetig. In Next.js 16 heisst die Datei "proxy.ts" (frueher "middleware.ts").
 export function proxy(request: NextRequest) {
   const password = process.env.SITE_PASSWORD;
   if (!password) return NextResponse.next();

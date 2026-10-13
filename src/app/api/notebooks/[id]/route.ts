@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 const MAX_TITLE_LENGTH = 200;
 
-// Optionales Feature (siehe CLAUDE.md "Optional"): Notebook umbenennen.
+// Notebook umbenennen.
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -59,7 +59,7 @@ export async function DELETE(
   }
 
   // Schuetzt das vorbefuellte Demo-Notebook vor versehentlichem Loeschen
-  // (siehe CLAUDE.md) -- sonst sieht der naechste Reviewer eine leere App.
+  // (siehe CLAUDE.md) -- sonst waere das Live-Deployment danach leer.
   if (notebook.is_demo) {
     return Response.json(
       { error: "Das Demo-Notebook kann nicht gelöscht werden." },

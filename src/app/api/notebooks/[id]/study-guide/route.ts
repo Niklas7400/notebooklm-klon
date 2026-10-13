@@ -1,8 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateStudyGuide } from "@/lib/groq";
 
-// Optionales Feature (siehe CLAUDE.md "Optional"): Study Guide + FAQ auf
-// Knopfdruck. Wird bei jedem Klick frisch generiert und in
+// Study Guide + FAQ auf Knopfdruck. Wird bei jedem Klick frisch generiert und in
 // notebooks.study_guide ueberschrieben (wie die Zusammenfassung), sonst ist
 // er nach einem Reload bzw. erneutem Oeffnen des Notebooks weg.
 export const maxDuration = 60;

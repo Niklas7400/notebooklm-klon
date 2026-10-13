@@ -3,7 +3,7 @@ import { generateAudioScript } from "@/lib/groq";
 import { synthesizeSpeech } from "@/lib/tts";
 import type { AudioScriptLine } from "@/lib/types";
 
-// Audio-Overview-Flow (Tag 8, siehe CLAUDE.md): Skript-Generierung -> pro
+// Audio-Overview-Flow (siehe CLAUDE.md): Skript-Generierung -> pro
 // Zeile ein TTS-Call -> Upload nach Supabase Storage -> Skript + Clip-URLs
 // in notebooks speichern. On-demand ueber diesen Endpoint ausgeloest, nicht
 // automatisch bei jedem Upload (TTS hat ein begrenztes Freikontingent).

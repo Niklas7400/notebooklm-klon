@@ -5,7 +5,7 @@ import { embedDocuments } from "@/lib/voyage";
 
 // Upload-Flow: Text-Extraktion -> Validierung -> Speichern -> Chunking ->
 // Batch-Embeddings -> Speichern (siehe CLAUDE.md). Die Zusammenfassung wird
-// als separater, vom Frontend ausgeloester Request nachgereicht (Tag 5).
+// als separater, vom Frontend ausgeloester Request nachgereicht.
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 

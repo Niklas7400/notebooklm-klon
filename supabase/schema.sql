@@ -1,5 +1,5 @@
 -- NotebookLM-Klon: Schema fuer Supabase (Postgres + pgvector)
--- In den Supabase SQL Editor einfuegen und ausfuehren (Tag 1).
+-- In den Supabase SQL Editor einfuegen und einmalig ausfuehren.
 -- pgvector-Extension muss vorher unter Database > Extensions aktiviert sein.
 
 create extension if not exists vector;
@@ -55,8 +55,8 @@ alter table messages enable row level security;
 
 -- Index fuer die Aehnlichkeitssuche. Bei Demo-Datenmengen performance-technisch
 -- irrelevant (Postgres scannt auch ohne Index schnell genug), aber Standard-Praxis
--- und wird von jedem technischen Reviewer erwartet -- daher trotzdem anlegen
--- und im README kurz begruenden, warum er bei dieser Groesse nicht noetig waere.
+-- und fuer groessere Datenmengen noetig -- daher trotzdem anlegen (im README
+-- steht kurz, warum er bei dieser Groesse nicht noetig waere).
 create index on chunks using hnsw (embedding vector_cosine_ops);
 
 create or replace function match_chunks (

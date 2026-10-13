@@ -22,7 +22,7 @@ export async function synthesizeSpeech(text: string, speaker: "A" | "B"): Promis
       voice: { languageCode: "de-DE", name: VOICE_BY_SPEAKER[speaker] },
       // headphone-class-device: Googles eigenes Post-Processing-Profil,
       // abgestimmt auf Kopfhoerer-/Laptop-Lautsprecher-Wiedergabe -- der
-      // realistische Hoerkontext fuer einen Reviewer. Live getestet, mit
+      // typische Hoerkontext der Podcast-Wiedergabe. Live getestet, mit
       // Chirp3-HD kompatibel (anders als z.B. "pitch", das dieses Voice-
       // Modell nicht unterstuetzt).
       audioConfig: { audioEncoding: "MP3", effectsProfileId: ["headphone-class-device"] },

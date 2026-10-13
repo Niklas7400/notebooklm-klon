@@ -4,8 +4,7 @@ import { regenerateNotebookSummary } from "@/lib/summary";
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
-// Optionales Feature (siehe CLAUDE.md "Optional"): Klick auf eine Quelle
-// zeigt ihren Volltext an. raw_text liegt bereits vollstaendig in der DB,
+// Klick auf eine Quelle zeigt ihren Volltext an. raw_text liegt bereits vollstaendig in der DB,
 // kein zusaetzlicher LLM-Call noetig.
 export async function GET(
   _request: Request,

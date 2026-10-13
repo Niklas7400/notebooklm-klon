@@ -82,7 +82,7 @@ Frage: ${question}`;
   return text.trim();
 }
 
-// Streaming-Variante fuer den Chat (Tag 6): liefert die Antwort als Folge von
+// Streaming-Variante fuer den Chat: liefert die Antwort als Folge von
 // Text-Deltas statt einmalig am Stueck, damit das Frontend Tokens anzeigen
 // kann, sobald sie ankommen. Groq streamt im gleichen SSE-Format wie OpenAI
 // ("data: {...}\n\n", abgeschlossen mit "data: [DONE]").
@@ -194,9 +194,8 @@ ${context}`;
     .slice(0, 4);
 }
 
-// Folgefragen nach jeder Chat-Antwort (Nutzerwunsch, nicht in CLAUDE.md
-// vorgegeben): gleiches leichtes Modell wie beim Query-Rewriting, damit der
-// Zusatz-Call die eigentliche (gestreamte) Antwort nicht spuerbar verzoegert.
+// Folgefragen nach jeder Chat-Antwort: gleiches leichtes Modell wie beim
+// Query-Rewriting, damit der Zusatz-Call die eigentliche (gestreamte) Antwort nicht spuerbar verzoegert.
 // Bekommt zusaetzlich zum Frage-Antwort-Austausch die tatsaechlich gefundenen
 // Quellenausschnitte -- sonst assoziiert das Modell frei anhand des reinen
 // Antworttexts und schlaegt Folgefragen zu Themen vor, die die Quelle gar
@@ -253,8 +252,7 @@ export function stripMarkdownCodeFence(text: string): string {
   return fenceMatch ? fenceMatch[1].trim() : trimmed;
 }
 
-// Mind Map (optionales Feature, urspruenglich bewusst ausgelassen, siehe
-// CLAUDE.md): verschachtelte Markdown-Gliederung statt strengem JSON, weil
+// Mind Map: verschachtelte Markdown-Gliederung statt strengem JSON, weil
 // Llama dieses Format schon beim Study Guide zuverlaessig liefert. Das
 // Frontend rendert die Gliederung per Markmap zu einer interaktiven Mind Map
 // -- die Baum-Layout-Arbeit uebernimmt die Bibliothek, nicht der Prompt.
@@ -288,7 +286,7 @@ ${context}`;
   return { text: stripMarkdownCodeFence(text), usedFallbackModel };
 }
 
-// Audio Overview (Tag 8): lockeres Zwei-Personen-Podcast-Skript als JSON.
+// Audio Overview: lockeres Zwei-Personen-Podcast-Skript als JSON.
 // Auf Anfrage generiert, nicht bei jedem Upload (siehe CLAUDE.md) -- TTS hat
 // im Gegensatz zu Groq ein begrenztes Freikontingent.
 export async function generateAudioScript(

@@ -11,7 +11,7 @@ import type { Citation } from "@/lib/types";
 // Chat/RAG-Flow (siehe CLAUDE.md): Guard -> Verlauf laden -> ggf. Query-Rewriting
 // -> Embedding -> Aehnlichkeitssuche -> Groq-Antwort (gestreamt) -> Speichern.
 //
-// Streaming-Ansatz (Tag 6): Die Antwort wird als reiner Text-Stream an den
+// Streaming-Ansatz: Die Antwort wird als reiner Text-Stream an den
 // Client geschickt. Die Zitate haengen nicht vom Antworttext ab (sie werden
 // schon aus den match_chunks-Treffern gebaut, bevor das LLM ueberhaupt
 // aufgerufen wird) und koennen deshalb sofort als Header mitgeschickt werden,

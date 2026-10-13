@@ -1,9 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateSuggestedQuestions } from "@/lib/groq";
 
-// Optionales Feature (siehe CLAUDE.md "Optional"): vorgeschlagene
-// Einstiegsfragen nach Upload. Vom Frontend direkt nach der Summary neu
-// angefordert, passt sich so an neu hinzugekommene Quellen an. Ergebnis wird
+// Vorgeschlagene Einstiegsfragen nach Upload. Vom Frontend direkt nach der
+// Summary neu angefordert, passt sich so an neu hinzugekommene Quellen an. Ergebnis wird
 // in notebooks.suggested_questions ueberschrieben (wie die Zusammenfassung),
 // sonst sind die Vorschlaege nach einem Reload bzw. erneutem Oeffnen des
 // Notebooks weg statt weiterhin zu den aktuellen Quellen zu passen.

@@ -1,7 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateMindMap } from "@/lib/groq";
 
-// Optionales Feature (urspruenglich bewusst ausgelassen, siehe CLAUDE.md) --
 // Mind Map als verschachtelte Markdown-Gliederung, vom Frontend per Markmap
 // zu einer interaktiven Grafik gerendert. Wird bei jedem Klick frisch
 // generiert und in notebooks.mind_map ueberschrieben (wie Zusammenfassung
