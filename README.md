@@ -1,8 +1,6 @@
 # NotebookLM-Klon
 
-Die App lässt dich Dokumente (PDF, Text, URL) in Notebooks hochladen und Fragen dazu stellen; die Antworten verweisen per Retrieval-Augmented Generation (RAG) auf die konkreten Quellstellen. Sie ist ein Portfolio- und Lernprojekt, das eine vollständige RAG-Pipeline von der Textextraktion über Embeddings und Vektorsuche bis zur zitierenden Antwort zeigt. Technisch kommen Next.js (App Router) mit TypeScript, Supabase/PostgreSQL mit pgvector, ein Passwortschutz per Middleware, Unit-Tests mit Vitest und ein Docker-Setup für den lokalen Start zum Einsatz.
-
-Ein funktionierender Klon von [NotebookLM](https://notebooklm.google.com), gebaut als Bewerbungsaufgabe. Ziel war zu zeigen, dass ich eine RAG-Architektur (Retrieval-Augmented Generation) sauber umsetzen und dabei den Umfang eines Ein-Wochen-Projekts realistisch priorisieren kann.
+Der NotebookLM-Klon ist ein Portfolio-Projekt: ein Nachbau von [NotebookLM](https://notebooklm.google.com), in dem man Dokumente (PDF, Text, URL) in Notebooks hochlädt, Fragen dazu stellt und Antworten mit klickbaren Quellenangaben erhält — per Retrieval-Augmented Generation (RAG). Er ist zugleich ein Lernprojekt und zeigt eine vollständige RAG-Pipeline von der Textextraktion über Embeddings und Vektorsuche bis zur zitierenden Antwort. Technisch kommen Next.js (App Router) mit TypeScript, Supabase/PostgreSQL mit pgvector, ein Passwortschutz per Middleware, Unit-Tests mit Vitest und ein Docker-Setup zum Einsatz.
 
 ## Was die App kann
 
@@ -28,9 +26,9 @@ Next.js (App Router) als Frontend und API-Layer in einem, Supabase/Postgres mit 
 
 | Bereich | Wahl | Warum |
 |---|---|---|
-| Framework | Next.js (App Router) + TypeScript + Tailwind CSS | Vorgabe |
+| Framework | Next.js (App Router) + TypeScript + Tailwind CSS | Frontend und API-Routen in einem Projekt |
 | PDF-Parsing | [`unpdf`](https://github.com/unjs/unpdf) | Läuft ohne native Abhängigkeiten in Vercel Serverless Functions |
-| Chunking | LangChain.js `RecursiveCharacterTextSplitter` | 900 Zeichen/Chunk, 150 Zeichen Overlap (~17%). Bewusst kleiner als die ursprünglich geplanten ~1800 Zeichen (≈500 Tokens): Beim Test mit einem echten 24-seitigen PDF enthielt ein 1800-Zeichen-Chunk oft mehrere thematisch verschiedene Punkte, sodass der angezeigte Zitat-Ausschnitt deutlich mehr Kontext zeigte als für die belegte Aussage nötig |
+| Chunking | LangChain.js `RecursiveCharacterTextSplitter` | 900 Zeichen/Chunk, 150 Zeichen Overlap (~17%). Bewusst kleiner als die naheliegenden ~1800 Zeichen (≈500 Tokens): Beim Test mit einem echten 24-seitigen PDF enthielt ein 1800-Zeichen-Chunk oft mehrere thematisch verschiedene Punkte, sodass der angezeigte Zitat-Ausschnitt deutlich mehr Kontext zeigte als für die belegte Aussage nötig |
 | Embeddings & Reranking | Voyage AI, `voyage-4-lite` (Embeddings) + `rerank-2-lite` (Reranking) | 200 Mio. Freitokens/Account, hohes Batch-Limit (1M Tokens/Request); gleicher Account/Key für beide Modelle |
 | Vektor-Speicher | Supabase (Postgres + `pgvector`) | REST-basierter JS-Client statt direkter Postgres-Connection (Connection-Limits in Serverless Functions) |
 | Chat-LLM | Groq, `llama-3.3-70b-versatile` (Chat/Zusammenfassung), `llama-3.1-8b-instant` (Query-Rewriting) | Echter Free-Tier ohne Kreditkarte, keine EU-Einschränkung; automatischer Fallback auf `llama-3.1-8b-instant`, falls das Tageslimit von `llama-3.3-70b-versatile` erreicht ist (mit Hinweis im UI) |
@@ -77,26 +75,26 @@ npm test
 
 73 Unit-Tests über 8 Dateien für die reine, von externen APIs unabhängige Logik: Chunker, Zitat-Parser, Leertext-Validierung, HTML-Extraktion für URL-Quellen, RAG-Prompt-/Zitat-Aufbau, relative Datumsanzeige, das Parsen der Audio-Overview-Skript-Antwort, das Entfernen von Codeblock-Wrappern aus der Mind-Map-Markdown-Antwort, das Abtrennen der Folgefragen vom Chat-Antwort-Stream, das Entfernen von Steuerzeichen aus PDF-Text und die Groq-Fallback-Modell-Logik (mit gemocktem `fetch`, ohne echten Netzwerk-Call) — die Stellen, an denen sich Formatannahmen am leichtesten stillschweigend brechen lassen. Den größten Block stellt dabei das Audio-Skript-Parsing: Das schwächere Fallback-Modell hält das geforderte JSON-Format nicht zuverlässig ein (mehrere separate Arrays statt einem, fehlende äußere Klammern, Wrapper-Objekt, Trailing-Komma, abgeschnittene Antwort) — jeder dieser Fälle wurde live beobachtet oder in einem Review konstruiert und ist als Regressionstest festgehalten. Funktionen mit echten API-Calls (Groq, Voyage, Google TTS, Supabase) sind ansonsten bewusst nicht unit-getestet, sondern manuell gegen die echte Umgebung verifiziert (siehe Commit-Historie).
 
-## Bewusste Scope-Entscheidungen
+## Entscheidungen und Abgrenzung
 
-Der Umfang war frei wählbar. Umgesetzt wurden, in dieser Priorität:
+Der Umfang ist bewusst begrenzt. Umgesetzt wurde, in dieser Priorität:
 
 - **MVP**: Notebooks/Quellen/Chat verwalten, RAG-Chat mit Zitaten, automatische Zusammenfassung, persistenter Chatverlauf, RLS auf allen Tabellen, Guard fürs Demo-Notebook
-- **Streaming-Chat-Antworten** — vor Audio Overview, weil es die im MVP schon vorhandene Antwortqualität spürbar verbessert (kein Warten auf den kompletten Text), bevor ein komplett neues Feature dazukommt
-- **Quellen-Auswahl per Checkbox, URL-Quelle, vorbefülltes Demo-Notebook, Passwortschutz** — hoher Wirkungsgrad bei geringem Aufwand: ein Reviewer hat typischerweise nur wenige Minuten Zeit, das vorbefüllte Demo-Notebook dürfte davon den größten Unterschied machen
-- **Audio Overview** (Zwei-Stimmen-Podcast) bewusst vor die ursprünglich geplanten "Nice-to-have"-Punkte 1 und 3 gezogen, weil Sprachinterfaces ein wichtiges Anwendungsfeld sind. On-demand per Button, nicht automatisch bei jedem Upload, weil TTS im Gegensatz zu Groq ein begrenztes Freikontingent hat.
-- **Reranking und Mind Map** wurden ursprünglich bewusst ausgelassen (siehe unten), nachträglich aber doch ergänzt — Reranking wegen der Skalierbarkeit bei großen Notebooks, Mind Map als weiterer, mit Markmap technisch günstig umsetzbarer Baustein der RAG-Inhaltsaufbereitung.
-- **Zuletzt, weil die Zeit reichte:** die als optional eingeplanten Punkte — mehrere Notebooks parallel verwalten, Study Guide, Notebook umbenennen, Volltext-Ansicht einer Quelle, Einstiegsfragen im leeren Chat. Bewusst am Ende, nicht vorgezogen: keiner davon zeigt etwas über die RAG-Architektur, um die es in der Aufgabe eigentlich geht.
+- **Streaming-Chat-Antworten** — verbessern die im MVP schon vorhandene Antwortqualität spürbar (kein Warten auf den kompletten Text)
+- **Quellen-Auswahl per Checkbox, URL-Quelle, vorbefülltes Demo-Notebook, Passwortschutz** — hoher Nutzen bei geringem Aufwand; das vorbefüllte Demo-Notebook sorgt dafür, dass die App beim ersten Öffnen sofort ausprobiert werden kann
+- **Audio Overview** (Zwei-Stimmen-Podcast) als Voice-Baustein, weil Sprachinterfaces ein wichtiges Anwendungsfeld sind. On-demand per Button, nicht automatisch bei jedem Upload, weil TTS im Gegensatz zu Groq ein begrenztes Freikontingent hat.
+- **Reranking und Mind Map** — Reranking wegen der Skalierbarkeit bei großen Notebooks, Mind Map als weiterer, mit Markmap technisch günstig umsetzbarer Baustein der RAG-Inhaltsaufbereitung.
+- **Abrundende Funktionen:** mehrere Notebooks parallel verwalten, Study Guide, Notebook umbenennen, Volltext-Ansicht einer Quelle, Einstiegsfragen im leeren Chat. Sie zeigen nichts Neues über die RAG-Architektur, machen die App aber runder.
 
-**Explizit nicht umgesetzt** (bewusste Entscheidung, kein Zeitmangel-Zufall):
+**Explizit nicht umgesetzt** (bewusst nicht Teil des Projekts):
 
-- Video Overview / Sharing / "Discover Sources" — weitere NotebookLM-Features außerhalb des gesetzten Rahmens
+- Video Overview / Sharing / "Discover Sources" — weitere NotebookLM-Features außerhalb des Projektumfangs
 - Pixelgenaues Highlighting **im gerenderten PDF** (Koordinaten-Overlay auf der Original-Seite, wie es ein echter PDF-Viewer bräuchte) — es gibt bewusst keinen PDF-Renderer, nur die extrahierte Volltext-Ansicht. Die zitierte Stelle selbst *wird* hervorgehoben: ein Klick auf einen Zitat-Verweis klappt die Quelle links auf und markiert die exakte Textstelle dort farblich (siehe Feature-Liste oben)
 - Multi-User-Auth/Rechteverwaltung — Deployment ist ein einzelner passwortgeschützter Demo-Zugang, keine Nutzerverwaltung nötig
 
 ## Status
 
-Alle Punkte aus MVP, den Tag-5-Erweiterungen, Streaming (Tag 6) und Audio Overview (Tag 8) sind umgesetzt, dazu die nachträglich ergänzten (Reranking, Mind Map, Study Guide, Modell-Fallback) und die optionalen Punkte. Getestet wurde gegen das echte Live-Deployment — inklusive Fehlerfällen (fehlgeschlagene TTS-Calls, erschöpftes Groq-Tageslimit, parallele Generierungs-Requests, leeres Notebook, PDFs ohne Text-Layer).
+Alle oben genannten Funktionen sind umgesetzt. Getestet wurde gegen das echte Live-Deployment — inklusive Fehlerfällen (fehlgeschlagene TTS-Calls, erschöpftes Groq-Tageslimit, parallele Generierungs-Requests, leeres Notebook, PDFs ohne Text-Layer).
 
 ## Bekannte Grenzen
 
@@ -108,7 +106,7 @@ Alle Punkte aus MVP, den Tag-5-Erweiterungen, Streaming (Tag 6) und Audio Overvi
 - **HTML-Extraktion bei URL-Quellen** ist eine einfache, Regex-basierte Bereinigung (kein Readability-Algorithmus) — bei Seiten mit viel Navigations-/Boilerplate-Text landet dieser mit im extrahierten Text.
 - **Open-Source-LLM-Grenzen**: Llama hält sich bei strikten Format-/Verhaltensvorgaben (Zitat-Format, "nur aus den Quellen antworten") in der Praxis etwas weniger zuverlässig an Vorgaben als z. B. Claude — siehe `NOTES.md` für konkret beobachtete Fälle und mögliche Prompt-Verbesserungen.
 - **Audio Overview läuft synchron innerhalb eines Requests** (kein Job-Queue-System) — bei sehr langen Skripten könnte das theoretisch an das Vercel-Timeout (60s) stoßen; in Tests mit 10–16 Gesprächszeilen lag die Generierung bei 3–8s. Einzelne fehlgeschlagene TTS-Zeilen werden übersprungen (nach einem Retry), statt den ganzen Flow abzubrechen.
-- **TTS-Qualitätsdecke bei Google Cloud TTS**: Die klassische Cloud-Text-to-Speech-API (aktuell `de-DE-Chirp3-HD-*`-Stimmen) spricht englische Fachbegriffe im sonst deutschen Podcast-Skript stellenweise noch mit deutscher Phonetik aus, wenn auch deutlich seltener als mit den ursprünglichen WaveNet-Stimmen. Zwei mögliche nächste Schritte, bewusst nicht umgesetzt, um kein zusätzliches Geld/Setup in ein Nice-to-have-Feature zu stecken: (1) Geminis natives Multi-Speaker-TTS (`gemini-2.5-flash-preview-tts`, ein ganzer Dialog in einem Call statt 12+ Einzel-Calls, bessere Mehrsprachigkeit) läuft über ein separates AI-Studio-Prepay-Konto, unabhängig vom allgemeinen Google-Cloud-Guthaben — bräuchte einen eigenen Top-up. (2) ElevenLabs wurde von vornherein ausgeschlossen (siehe Tech-Stack-Begründung oben). SSML-Feinschliff (`<break>`-Pacing, `speakingRate`-Variation zwischen den Hosts) bliebe als kostenloser, ungenutzter nächster Schritt innerhalb der aktuellen Architektur.
+- **TTS-Qualitätsdecke bei Google Cloud TTS**: Die klassische Cloud-Text-to-Speech-API (aktuell `de-DE-Chirp3-HD-*`-Stimmen) spricht englische Fachbegriffe im sonst deutschen Podcast-Skript stellenweise noch mit deutscher Phonetik aus, wenn auch deutlich seltener als mit den ursprünglichen WaveNet-Stimmen. Zwei mögliche nächste Schritte, bewusst nicht umgesetzt, um kein zusätzliches Geld/Setup in ein Nice-to-have-Feature zu stecken: (1) Geminis natives Multi-Speaker-TTS (`gemini-2.5-flash-preview-tts`, ein ganzer Dialog in einem Call statt 12+ Einzel-Calls, bessere Mehrsprachigkeit) läuft über ein separates AI-Studio-Prepay-Konto, unabhängig vom allgemeinen Google-Cloud-Guthaben — bräuchte einen eigenen Top-up. (2) ElevenLabs wurde von vornherein ausgeschlossen (nur 10.000 Zeichen/Monat im Free Tier, zusätzlich Wasserzeichen auf der Ausgabe). SSML-Feinschliff (`<break>`-Pacing, `speakingRate`-Variation zwischen den Hosts) bliebe als kostenloser, ungenutzter nächster Schritt innerhalb der aktuellen Architektur.
 - **Fish Audio als TTS-Alternative geprüft, nicht übernommen**: Live gegen die echte API getestet (kostenloses `s2.1-pro-free`-Modell, laut Anbieter befristet bis 2026-08-31) — funktioniert, inklusive zweier passender deutscher Stimmen für die Podcast-Hosts. Bewusst nicht als Ersatz für Google Cloud TTS übernommen: (1) die Stimmenbibliothek ist ein unkuratierter Community-Marktplatz — in derselben deutschen Trefferliste tauchten auch geschmacklose Charakter-Stimmen auf, eine seriöse Auswahl bräuchte laufende manuelle Prüfung statt eines einmal gesetzten, stabilen Defaults; (2) der kostenlose Zugang ist laut Anbieter explizit befristet und "ohne SLA" für Produktion nicht vorgesehen; (3) Anfragen dürfen laut Anbieter zur Modellverbesserung verwendet werden, anders als bei Google Cloud TTS.
 
 ## Datenmodell
