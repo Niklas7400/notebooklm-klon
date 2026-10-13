@@ -1,5 +1,7 @@
 # NotebookLM-Klon
 
+Die App lässt dich Dokumente (PDF, Text, URL) in Notebooks hochladen und Fragen dazu stellen; die Antworten verweisen per Retrieval-Augmented Generation (RAG) auf die konkreten Quellstellen. Sie ist ein Portfolio- und Lernprojekt, das eine vollständige RAG-Pipeline von der Textextraktion über Embeddings und Vektorsuche bis zur zitierenden Antwort zeigt. Technisch kommen Next.js (App Router) mit TypeScript, Supabase/PostgreSQL mit pgvector, ein Passwortschutz per Middleware, Unit-Tests mit Vitest und ein Docker-Setup für den lokalen Start zum Einsatz.
+
 Ein funktionierender Klon von [NotebookLM](https://notebooklm.google.com), gebaut als Bewerbungsaufgabe. Ziel war zu zeigen, dass ich eine RAG-Architektur (Retrieval-Augmented Generation) sauber umsetzen und dabei den Umfang eines Ein-Wochen-Projekts realistisch priorisieren kann.
 
 ## Was die App kann
